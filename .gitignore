@@ -1,0 +1,48 @@
+# Python bytecode / packaging
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Virtualenvs locais
+.venv/
+.venv-*/
+venv/
+
+# Testes / type-check / notebooks
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.ipynb_checkpoints/
+
+# Scratch local / logs avulsos
+tmp/
+scratch/
+logs/
+*.tmp
+*.bak
+*.log
+*.swp
+*~
+
+# Ambiente e segredos (credenciais Earthdata, tokens)
+.env
+.env.*
+!.env.example
+secrets/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Editor/sistema
+.DS_Store
+.vscode/
+.idea/
+
+# Saídas geradas e dados brutos fora do snapshot versionado.
+# O snapshot NASA versionado (data/snapshots/<versão>/) É commitado.
+data/raw/
+data/cache/
+reports/generated/

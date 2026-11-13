@@ -1,0 +1,17 @@
+[project]
+name = "fieldshift-optimizer"
+version = "0.0.0"
+description = "Apoio à decisão para rotação de culturas sob incerteza climática (NASA Space Apps 2026, desafio Field Shift)."
+requires-python = ">=3.12"
+# Dependências são definidas a partir de 14/11 às 9h, após congelar a formulação e a interface.
+dependencies = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
