@@ -1,0 +1,199 @@
+# FieldShift Optimizer — catálogo agronômico (dono: Methods Scientist)
+# Origem: docs/planning/prep/methods-scientist.md, seção "Revisão 13/11 noite"; docs/DECISIONS.md prevalece.
+# Marcas nos campos `status`/comentários: "V <fonte>" = verificado na fonte; "hipotese" = convenção de modelagem
+# não verificada. Fontes completas (URL) em docs/DATA_SOURCES.md e docs/AGRONOMY.md.
+# Catálogo fechado: 5 culturas + pousio. Não acrescentar culturas sem nova aprovação do usuário.
+
+schema_version = 1
+region = "Rio Verde (GO), IBGE 5218805, sequeiro"
+
+# ---------------------------------------------------------------------------
+# Calendário de dias (igual ao protocolo e à formulação do Optimization, R4)
+# ---------------------------------------------------------------------------
+[calendar]
+agri_year_start = "09-01"           # ano agrícola y: 1/set de y a 31/ago de y+1
+drop_feb29 = true                   # 29/fev descartado de todas as séries: 365 dias por ano agrícola
+days_per_agri_year = 365
+horizon_agri_years = 2              # cenário = par (y, y+1); J1–J2 usam y, J3–J4 usam y+1
+horizon_days = 730
+# Dia-índice t do cenário: t = 0 em 1/set de y; t = 365 em 1/set de y+1. Datas mês-dia no calendário de 365 dias.
+emergence_days = 7                  # hipotese: ZARC assume emergência em 5 a 10 dias (V Port. SPA/MAPA 368/2025)
+emergence_status = "hipotese"
+operational_margin_days = 0         # hipotese: dias entre colheita de J1/J3 e semeadura de J2/J4
+operational_margin_status = "hipotese"
+# Datas derivadas (inteiros, em dias-índice):
+#   emergencia  e = s + emergence_days
+#   colheita    h = e + cycle_days            (maturação fisiológica = colheita no mesmo dia; hipotese)
+#   ciclo vivo  dias [e, h)                   (h é exclusivo)
+
+# ---------------------------------------------------------------------------
+# Decêndios ZARC (V dicionário da Tábua de Risco): dec1 = 1–10/jan, dec2 = 11–20/jan,
+# dec3 = 21–31/jan (último dia do mês), ..., dec36 = 21–31/dez. Mês = (d-1)//3 + 1;
+# início = dia 1, 11 ou 21. Em fevereiro, dec6 = 21–28/fev (29/fev descartado).
+# Decêndios 25–36 (set–dez) caem no ano civil y; decêndios 1–24 (jan–ago) caem em y+1.
+# ---------------------------------------------------------------------------
+[zarc]
+file = "zarc/zarc-tabua-rio-verde-5218805-2026-2027.csv"
+sha256 = "88f24986b6063e0eaba7bd0cd83f97d9a623f5c5f9ada156711e318b9e3218ad"
+safra = "2026/2027"
+csv_separator = ";"
+csv_encoding = "utf-8-sig"          # o arquivo tem BOM
+risk_limit_percent = 20             # decisão 1 do usuário; nunca sobe automaticamente nem como sensibilidade
+# Regra exata de filtro (todas as colunas são texto no CSV):
+#   geocodigo == "5218805"
+#   Nome_cultura == crops.<id>.zarc_name           (cadeia exata, com acentos)
+#   Cod_Ciclo == "20"                               (Grupo I)
+#   Cod_Outros_Manejos == "1"                       (Sequeiro)
+#   Cod_Solo == código do solo escolhido por soil.toml conforme crops.<id>.zarc_soil_key
+#   Deve sobrar exatamente 1 linha; 0 ou >1 linhas = erro explícito (não escolher outra linha).
+#   Decêndio d permitido  <=>  coluna "dec{d}" == "20"   (valores "30", "40" e "0" = proibido)
+filter_geocodigo = "5218805"
+filter_cod_ciclo = "20"
+filter_cod_outros_manejos = "1"
+allowed_risk_value = "20"
+decendio_column_prefix = "dec"
+
+# ---------------------------------------------------------------------------
+# Janelas e regras de calendário/sucessão
+# ---------------------------------------------------------------------------
+[windows.J1]
+season = "verao"
+agri_year_index = 0                 # clima do ano y
+crops = ["soja", "milho_1a"]
+sowing_rule = "decendio_start"      # semeadura no 1º dia de um decêndio permitido (variável de decisão)
+decendios = [25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36]   # candidatos; ZARC e legal_window filtram
+fallow_allowed = false              # J1 sempre tem cultura de grão
+
+[windows.J2]
+season = "segunda_safra"
+agri_year_index = 0
+crops = ["milho_2a", "milho_2a_braquiaria", "sorgo_2a"]
+sowing_rule = "derived_after_previous_harvest"
+# Semeadura derivada (não é variável): s2 = primeiro dia t >= h(J1) + operational_margin_days
+# cujo decêndio esteja permitido (ZARC 20%) para a cultura e o solo; procura até 30/abr do ano y+1.
+# Se não houver t, a cultura é inviável nessa janela.
+decendios = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+fallow_allowed = "only_if_no_feasible_crop"   # decisão do Development Lead (DECISIONS.md): pousio só se nenhuma 2ª safra for viável
+
+[windows.J3]
+season = "verao"
+agri_year_index = 1
+crops = ["soja", "milho_1a"]
+sowing_rule = "decendio_start"
+decendios = [25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36]
+fallow_allowed = false
+
+[windows.J4]
+season = "segunda_safra"
+agri_year_index = 1
+crops = ["milho_2a", "milho_2a_braquiaria", "sorgo_2a"]
+sowing_rule = "derived_after_previous_harvest"
+decendios = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+fallow_allowed = "only_if_no_feasible_crop"
+
+[succession]
+# Restrições obrigatórias (verificador):
+#   S1 sem sobreposição no ano: s(J2) >= h(J1) + margem;  s(J4) >= h(J3) + margem
+#   S2 sem sobreposição entre anos: h(J2) <= s(J3) e h(J4) <= horizon_days
+#      (com o calendário ZARC atual a maior colheita de 2ª safra é ~13/jul; manter como asserção)
+#   S3 cada ocupação termina no próprio ano agrícola (h < 365 para J1/J2; h < 730 para J3/J4)
+# Nenhuma sucessão é proibida (sem fonte verificada); repetições entram só no indicador D2.
+forbidden_pairs = []
+# Braquiária do consórcio: continua viva após a colheita do milho até a dessecação antes de J3.
+brachiaria_desiccation_days_before_next_sowing = 15   # hipotese
+brachiaria_end_if_last_window = "horizon_end"         # consórcio em J4: braquiária viva até t = 730
+
+# ---------------------------------------------------------------------------
+# Culturas (um grupo de ciclo por cultura: Grupo I; justificativa em docs/AGRONOMY.md)
+# phase_days = [estabelecimento, vegetativo, floracao_enchimento (fase crítica), maturacao]; soma = cycle_days
+# Dias contados a partir da emergência.
+# ---------------------------------------------------------------------------
+[crops.soja]
+label = "Soja (Grupo I)"
+species = ["soja"]
+grain = true
+windows = ["J1", "J3"]
+zarc_name = "Soja"
+zarc_soil_key = "ad"                  # usa a classe AD1–AD6 de soil.toml
+cycle_group = "Grupo I"               # Cod_Ciclo 20
+cycle_days = 100                      # hipotese: ZARC simula ciclos de 100/115/130 d (V Port. 368/2025); Grupo I = 100 d é inferência
+cycle_status = "hipotese"
+phase_days = [15, 35, 30, 20]         # hipotese: frações do milho 1ª Grupo I (V Port. 178/2025) aplicadas à soja
+phase_status = "hipotese"
+# Calendário legal de GO (V IN Agrodefesa 6/2024, art. 2º e 8º): semeadura 25/set–02/jan; vazio 27/jun–24/set.
+# Regra conservadora: o decêndio inteiro deve caber na janela legal -> exclui dec27 (21–30/set) e dec1 (1–10/jan).
+# IN Agrodefesa 5/2026 (início 20/set só na safra 2026/27): não verificada no texto oficial; não muda nada,
+# porque dec27 está a 40% em Rio Verde.
+legal_window = ["09-25", "01-02"]
+legal_rule = "decendio_inteiro_dentro"
+
+[crops.milho_1a]
+label = "Milho 1ª safra (Grupo I)"
+species = ["milho"]
+grain = true
+windows = ["J1", "J3"]
+zarc_name = "Milho 1ª Safra"
+zarc_soil_key = "ad"
+cycle_group = "Grupo I"
+cycle_days = 100                      # V Port. 178/2025 (tabela: Grupo I, ciclo médio 100 d)
+cycle_status = "V Port. SPA/MAPA 178/2025"
+phase_days = [15, 35, 30, 20]         # V Port. 178/2025 (Grupo I: 15/35/30/20)
+phase_status = "V Port. SPA/MAPA 178/2025"
+
+[crops.milho_2a]
+label = "Milho 2ª safra (Grupo I)"
+species = ["milho"]
+grain = true
+windows = ["J2", "J4"]
+zarc_name = "Milho 2ª Safra"
+zarc_soil_key = "ad"
+cycle_group = "Grupo I"
+cycle_days = 110                      # V Port. 386/2025: Grupo I <= 110 d da emergência à maturação; usar o teto
+cycle_status = "V Port. SPA/MAPA 386/2025 (teto do grupo)"
+phase_days = [16, 39, 33, 22]         # hipotese: 15/35/30/20 % de 110 d, arredondado para somar 110
+phase_status = "hipotese"
+
+[crops.milho_2a_braquiaria]
+label = "Milho 2ª safra + braquiária (Grupo I)"
+species = ["milho", "braquiaria"]
+grain = true                          # conta como UMA ocorrência de grão (o milho) em g1
+windows = ["J2", "J4"]
+zarc_name = "Milho 2ª Safra consorciado com Braquiária"
+zarc_soil_key = "ad"
+cycle_group = "Grupo I"
+cycle_days = 115                      # V Port. 400/2025: Grupo I <= 115 d; usar o teto
+cycle_status = "V Port. SPA/MAPA 400/2025 (teto do grupo)"
+phase_days = [17, 40, 35, 23]         # hipotese: 15/35/30/20 % de 115 d, arredondado para somar 115
+phase_status = "hipotese"
+brachiaria_cover_after_harvest = true
+
+[crops.sorgo_2a]
+label = "Sorgo granífero 2ª safra (Grupo I)"
+species = ["sorgo"]
+grain = true
+windows = ["J2", "J4"]
+zarc_name = "Sorgo Granífero 2ª Safra"
+zarc_soil_key = "texture"             # usa a textura (arenosa/média/argilosa) de soil.toml
+cycle_group = "Grupo I"
+cycle_days = 110                      # V Port. 123/2025: Grupo I <= 110 d da emergência; usar o teto
+cycle_status = "V Port. SPA/MAPA 123/2025 (teto do grupo)"
+phase_days = [16, 39, 33, 22]         # hipotese: mesmas frações
+phase_status = "hipotese"
+
+[crops.pousio]
+label = "Pousio"
+species = []
+grain = false
+windows = ["J2", "J4"]
+# Só permitido quando nenhuma cultura de 2ª safra é viável na janela (fallow_allowed acima).
+
+# ---------------------------------------------------------------------------
+# Plano atual (P0) padrão da demonstração — hipotese (sistema regional soja + milho safrinha, não é dado de fazenda)
+# Verificado na tábua (ver config/zarc/VERIFICATION.md): viável em AD2–AD6; INVIÁVEL em AD1 (soja dec29 a 30%).
+# ---------------------------------------------------------------------------
+[current_plan_default]
+status = "hipotese"
+J1 = { crop = "soja", decendio = 29 }   # 11/out
+J2 = { crop = "milho_2a" }              # derivado: semeia em 26/jan (dec3) em AD4
+J3 = { crop = "soja", decendio = 29 }
+J4 = { crop = "milho_2a" }

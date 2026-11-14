@@ -1,0 +1,119 @@
+# FieldShift Optimizer — indicadores e perda (dono: Methods Scientist)
+# Alinhado a docs/planning/prep/optimization-engineer.md (Revisão 13/11 noite, R1/R4) e ao protocolo v1.1.
+# Só NASA POWER diário: PRECTOTCORR (mm/dia), T2M_MAX e T2M_MIN (°C). T2M (média) é carregado mas não usado.
+# Sem radiação, sem ET0, sem balanço hídrico (decisão 2). 1981–1983 permanecem.
+# Marcas: "V <fonte>" = limiar verificado na fonte; "hipotese" = convenção a manter congelada durante a avaliação.
+# Todos os g_k ficam em [0,1] por construção ("menor é melhor"); nenhum mínimo/máximo vem dos dados.
+
+schema_version = 1
+
+[variables]
+precip = "PRECTOTCORR"
+tmax = "T2M_MAX"
+tmin = "T2M_MIN"
+unused = ["T2M"]
+
+# ---------------------------------------------------------------------------
+# Notação (dias-índice do cenário, ver catalog.toml [calendar]):
+#   P[t], TX[t], TN[t] = valores do dia t (0 <= t < 730); J1–J2 usam t em [0,365), J3–J4 em [365,730).
+#   Ocorrência o de uma cultura de grão: semeadura s, emergência e = s + 7, ciclo L, fases (p1,p2,p3,p4),
+#   colheita h = e + L. Ciclo vivo = [e, h). Fase crítica (floração/enchimento) = [e+p1+p2, e+p1+p2+p3), n_crit = p3.
+#   [a, b) = dias a..b-1. Contagens são inteiras; razões em float64.
+# Dados ausentes (R4 da Optimization): -999/NaN viram ausente, nunca 0. O cenário só é válido se os 730 dias
+#   tiverem as três variáveis; senão sai para TODAS as políticas (registrado em log). Logo, aqui não há NaN.
+# ---------------------------------------------------------------------------
+
+[exposure]   # g1 — Exposição climática (eixo 1)
+grain_only = true
+# Para cada ocorrência de grão o (a braquiária do consórcio não é ocorrência separada):
+#   eps(o) = (e1 + e2 + e3 + e4 + e5) / 5                         [pesos iguais: hipotese]
+# g1(x, s) = média de eps(o) sobre as ocorrências de grão do plano (2 a 4; pousio não entra).
+#   Decisão do Development Lead (DECISIONS.md): média, não soma, para não premiar o pousio. O Methods concorda.
+component_weights = [0.2, 0.2, 0.2, 0.2, 0.2]
+component_weights_status = "hipotese"
+
+[exposure.e1]   # falha de estabelecimento (binário)
+formula = "e1 = 1 se soma(P[t] para t em [s, s+10)) < establishment_min_mm, senão 0"
+window_days = 10
+establishment_min_mm = 20.0
+status = "hipotese"
+
+[exposure.e2]   # veranico na fase crítica (fração)
+formula = "e2 = (maior sequência de dias consecutivos com P[t] < dry_day_mm em [ini_crit, fim_crit)) / n_crit"
+dry_day_mm = 1.0
+status = "hipotese"
+
+[exposure.e3]   # déficit relativo de chuva na fase crítica
+formula = "e3 = max(0, 1 - Pcrit / Pref); se Pref == 0, e3 = 0. Pcrit = soma(P[t], fase crítica)"
+# Pref = mediana de Pcrit nos anos agrícolas VÁLIDOS da construção (1981/82 a 2009/10; protocolo v1.1),
+#   para a mesma cultura e o mesmo dia-índice de semeadura dentro do ano agrícola (s mod 365).
+#   Calculada uma vez só com a construção e persistida com hash; nunca usa anos de teste (T2 do protocolo).
+#   Mediana = numpy.median (média dos dois centrais se n par).
+reference = "median_construction_by_crop_and_sowing_day"
+status = "hipotese"
+# Pcrit >= 0 e Pref > 0 => e3 em [0,1].
+
+[exposure.e4]   # estresse térmico (fração)
+formula = "e4 = média dos componentes aplicáveis à cultura: heat = #(t na fase crítica: TX[t] > heat_c)/n_crit; frost = #(t em [e,h): TN[t] <= frost_c, ou < se frost_strict)/L"
+# Comparabilidade: os limiares do ZARC referem-se a temperatura de abrigo meteorológico; POWER é reanálise a 2 m (N).
+[exposure.e4.soja]
+heat_c = 40.0          # V Port. SPA/MAPA 368/2025: >40 °C prejudica floração e retenção de vagens
+frost_c = 3.0          # V Port. 368/2025: risco de Tmin <= 3 °C
+frost_strict = false
+[exposure.e4.milho_1a]
+frost_c = 2.0          # V Port. 178/2025 e 386/2025: geada = Tmin <= 2 °C. Sem limiar de calor verificado para milho
+frost_strict = false
+[exposure.e4.milho_2a]
+frost_c = 2.0          # V Port. SPA/MAPA 386/2025
+frost_strict = false
+[exposure.e4.milho_2a_braquiaria]
+frost_c = 2.0          # mesmos critérios do milho (consórcio; Port. 400/2025 não traz limiar térmico próprio: N)
+frost_strict = false
+[exposure.e4.sorgo_2a]
+heat_c = 38.0          # V Port. SPA/MAPA 123/2025: restringe decêndios com Tmax acima de 38 °C
+frost_c = 2.0          # V Port. 123/2025: "temperaturas mínimas menores a 2 °C"
+frost_strict = true
+
+[exposure.e5]   # chuva na colheita (binário)
+formula = "e5 = 1 se #(t em [h-10, h): P[t] >= rain_day_mm) >= rain_days_min, senão 0"
+window_days = 10
+rain_day_mm = 1.0      # hipotese (o ZARC não define "dia de chuva" em mm)
+rain_days_min = 6      # V Port. SPA/MAPA 386/2025 (critério do milho: >= 6 dias de chuva no decêndio final); uso em soja e sorgo: hipotese
+status = "V critério do milho; hipotese limiar mm e extensão às outras culturas"
+
+[cover]   # g2 — Cobertura vegetal (eixo 2), proxy de calendário
+formula = "g2 = 0.5 * (1 - C1) + 0.5 * C2 / T"
+T = 730
+# Conjunto coberto K (dias t em [0, T)):
+#   + [e, h) de cada ocorrência de grão com e1 == 0 (falha de estabelecimento = 0 dias cobertos)
+#   + braquiária do consórcio (se a ocorrência do consórcio tem e1 == 0):
+#       consórcio em J2: [h, s(J3) - 15)   (dessecação 15 d antes da semeadura de J3; hipotese)
+#       consórcio em J4: [h, 730)
+#     (de e até h o dia já está coberto pelo milho)
+# C1 = |K| / T        C2 = maior sequência de dias consecutivos fora de K em [0, T)
+# Não mede biomassa, carbono, NDVI nem palhada.
+status = "hipotese (proxy)"
+
+[diversity]   # g3 — Diversidade (eixo 3), só do plano, sem clima
+formula = "g3 = 0.5 * (max_species - D1) / (max_species - 1) + 0.5 * D2 / max_repetitions"
+species_universe = ["soja", "milho", "braquiaria", "sorgo"]
+max_species = 4
+max_repetitions = 3
+# D1 = número de espécies distintas na união de crops.<id>.species das 4 janelas (pousio = vazio).
+#      Milho 1ª, milho 2ª e consórcio contam como "milho"; o consórcio soma também "braquiaria". D1 >= 1 sempre.
+# D2 = r1 + r2 + r3, cada um 0 ou 1:
+#   r1 = 1 se crop_id(J1) == crop_id(J3)
+#   r2 = 1 se crop_id(J2) == crop_id(J4) e não é pousio
+#   r3 = 1 se, em algum dos dois anos, J1 = milho_1a e J2 em {milho_2a, milho_2a_braquiaria} (milho após milho)
+# Repetições são indicadores, não proibições (sem fonte verificada para proibir).
+status = "hipotese (proxy)"
+
+[loss]
+formula = "L_w(x, s) = w_exposure * g1 + w_cover * g2 + w_diversity * g3"
+default_weights = { exposure = 0.50, cover = 0.25, diversity = 0.25 }   # decisão 4 do usuário
+weight_grid = "15 triplas (a,b,c)/4 com a+b+c = 4 (Optimization R2); só sensibilidade"
+rounding_decimals = 9   # comparações e desempates: round(v, 9) (Optimization R5)
+
+[orientation]
+# Para exibição: maior E é pior; maior C1 é melhor; maior C2 é pior; maior D1 é melhor; maior D2 é pior.
+# g1, g2, g3 e L: menor é melhor.

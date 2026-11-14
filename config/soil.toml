@@ -1,0 +1,53 @@
+# FieldShift Optimizer — solo (dono: Methods Scientist)
+# O solo é PARÂMETRO INFORMADO pelo usuário. Não há mapa de solo por talhão; o app não infere o solo da fazenda.
+
+schema_version = 1
+
+[default]
+ad_class = "AD4"
+texture = "argilosa"
+status = "hipotese"
+note = """Padrão da demonstração, não medição. Apoio indireto: SoilGrids 2.0 indica 29–51% de argila em dois
+pontos rurais de Rio Verde (consultado em 13/11/2026). A correspondência AD4 <-> argilosa NÃO foi verificada:
+a conversão oficial usa a função de pedotransferência da IN SPA/MAPA nº 1/2022 (não implementada, não lida)."""
+
+# Como o solo escolhe a linha do ZARC (catalog.toml, [zarc]):
+#   crops.<id>.zarc_soil_key == "ad"      -> Cod_Solo = ad_classes[ad_class].zarc_cod_solo
+#   crops.<id>.zarc_soil_key == "texture" -> Cod_Solo = textures[texture].zarc_cod_solo
+# Na tábua 2026/27 de Rio Verde: soja, milho 1ª, milho 2ª e milho 2ª + braquiária usam AD1–AD6;
+# sorgo granífero 2ª usa textura. (V dicionário de dados da Tábua de Risco; V recorte em config/zarc/)
+# As duas entradas são independentes; o app deve exibir ambas e não converter uma na outra.
+
+[ad_classes.AD1]
+zarc_cod_solo = "11"
+ad_mm_per_cm = [0.34, 0.46]   # V Port. SPA/MAPA 368/2025, limites da classe (informativo; não usado no motor)
+cad_mm_soja = 24              # V Port. 368/2025 (Ze = 60 cm; informativo)
+[ad_classes.AD2]
+zarc_cod_solo = "12"
+ad_mm_per_cm = [0.46, 0.61]
+cad_mm_soja = 32
+[ad_classes.AD3]
+zarc_cod_solo = "13"
+ad_mm_per_cm = [0.61, 0.80]
+cad_mm_soja = 42
+[ad_classes.AD4]
+zarc_cod_solo = "14"
+ad_mm_per_cm = [0.80, 1.06]
+cad_mm_soja = 55
+[ad_classes.AD5]
+zarc_cod_solo = "15"
+ad_mm_per_cm = [1.06, 1.40]
+cad_mm_soja = 72
+[ad_classes.AD6]
+zarc_cod_solo = "16"
+ad_mm_per_cm = [1.40, 1.84]
+cad_mm_soja = 95
+
+[textures.arenosa]
+zarc_cod_solo = "1"
+[textures.media]
+zarc_cod_solo = "2"
+[textures.argilosa]
+zarc_cod_solo = "3"
+
+# CAD não entra em nenhum indicador do MVP (sem balanço hídrico; decisão 2). Está aqui só para exibição.
