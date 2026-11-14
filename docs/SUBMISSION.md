@@ -2,7 +2,7 @@
 
 > **Target:** [Field Shift: Adapting Farms with NASA Data](https://www.spaceappschallenge.org/2026/challenges/adapting-farms-with-nasa-data/)
 > **Internal Deadline:** 2026-11-15 21:00 BRT (Official Deadline: 2026-11-15 23:59 in Team Owner's timezone).
-> **Note:** Do **not** submit externally without explicit user approval. Remaining `[RESULT PENDING]` slots are strictly for public URLs, team member details, SI media confirmation, and UI screenshot.
+> **Note:** Do **not** submit externally without explicit user approval. Remaining `[RESULT PENDING]` slots are strictly for the live app URL, unproduced demo video/deck link, team member details, and SI media confirmation (application screenshots are already linked from `docs/assets/`).
 
 ---
 
@@ -27,7 +27,7 @@ Format: [RESULT PENDING: 7-slide deck / 30-second video]
 ### Link to Final Project
 ```text
 Live App URL: [RESULT PENDING: public Streamlit Community Cloud URL without login]
-Public Repository URL: [RESULT PENDING: public GitHub URL https://github.com/Marcux777/fieldshift-optimizer verified without login]
+Public Repository URL: https://github.com/Marcux777/fieldshift-optimizer (created; verify public access after push)
 ```
 
 ### Detailed Description
@@ -36,7 +36,7 @@ Public Repository URL: [RESULT PENDING: public GitHub URL https://github.com/Mar
 Rainfed farmers in Rio Verde (Goiás, Brazil) choose multi-season crop rotations under substantial rainfall and dry-spell uncertainty. A rotation that looks optimal under average historical weather can suffer high climate exposure during dry years, while a worst-case-focused plan may sacrifice performance in typical years. FieldShift Optimizer helps explore a practical question: *"How do different crop rotation strategies compare when we do not know which climate conditions will occur?"*
 
 ### What the Application Delivers
-FieldShift Optimizer is a Streamlit decision-support tool for a two-agricultural-year, four-window (`J1`–`J4`) rainfed planning horizon. Users specify soil parameters (`AD1–AD6` water-availability class and texture), baseline rotation (`P0`), and objective preferences. The engine enumerates all `576` agronomically feasible rotations (at default `AD4 + clayey` soil) under official ZARC 2026/27 (`<= 20%` risk) and Goiás legal sowing/sanitary-void rules (`IN Agrodefesa 6/2024`), computes three normalized `[0, 1]` objectives (climate exposure `g1`, vegetation cover discontinuity `g2`, crop diversity deficit `g3`), maps the Pareto frontier (`36` non-dominated plans; `6` distinct crop-signature alternatives), and compares four strategies side by side:
+FieldShift Optimizer is a Streamlit decision-support tool for a two-agricultural-year, four-window (`J1`–`J4`) rainfed planning horizon. Users specify soil parameters (`AD1–AD6` water-availability class and texture), baseline rotation (`P0`), and objective preferences. The engine enumerates all `576` agronomically feasible rotations (at default `AD4 + clayey` soil) under official ZARC 2026/27 (`<= 20%` risk) and Goiás legal sowing/sanitary-void rules (`IN Agrodefesa 6/2024`), computes three normalized `[0, 1]` objectives (climate exposure `g1`, vegetation cover discontinuity `g2`, crop diversity deficit `g3`), maps the Pareto frontier (`36` distinct non-dominated objective vectors; `50` plans including `14` vector ties; `6` distinct crop-signature alternatives), and compares four strategies side by side:
 - **Current Plan (`P0`):** User-selected baseline rotation.
 - **Conventional Optimization (`P1`):** Best plan under average construction-period climate.
 - **Expected-Loss Optimization (`P1b`):** Best average loss across historical construction scenarios.
@@ -45,10 +45,10 @@ FieldShift Optimizer is a Streamlit decision-support tool for a two-agricultural
 Our contribution is the transparent decision-support tool and its leak-checked evaluation—not a claim that minimax regret is superior.
 
 ### How NASA Data Enables This Solution
-The application relies on a versioned offline snapshot of the **NASA POWER Daily Point API (`v2.10.3`, `MERRA2` + `POWER`, community `AG`)** for Rio Verde (`-18.0, -50.625`, elevation `625.31 m`), spanning `1981-01-01` to `2025-12-31` (`16,436` daily rows, zero missing `-999` values for `PRECTOTCORR`, `T2M`, `T2M_MAX`, `T2M_MIN`). Multi-decade NASA observations allow us to construct non-overlapping two-year historical climate scenarios, compute drought-exposure and heat/frost indicators, and separate parameter/plan selection (`1981/82–2009/10`, `28` pairs) from held-out retrospective testing (`2010/11–2024/25`, `14` pairs).
+The application relies on a versioned offline snapshot of the **NASA POWER Daily Point API (`v2.10.3`, `MERRA2` + `POWER`, community `AG`)** for Rio Verde (`-18.0, -50.625`, elevation `625.31 m`), spanning `1981-01-01` to `2025-12-31` (`16,436` daily rows, zero missing `-999` values for `PRECTOTCORR`, `T2M`, `T2M_MAX`, `T2M_MIN`). Multi-decade NASA observations allow us to construct consecutive (overlapping) two-year historical climate scenarios (`7` non-overlapping pairs are used for the Wilcoxon test), compute drought-exposure and heat/frost indicators, and separate parameter/plan selection (`1981/82–2009/10`, `28` pairs) from held-out retrospective testing (`2010/11–2024/25`, `14` pairs).
 
 ### Retrospective Evaluation & Results (Honest Negative Outcome)
-- **Verification:** `167` automated tests pass (`pytest -q`, `16.45s`) and `ruff check .` passes cleanly in the development container; independent evaluation (`reports/20261114T181200Z/eval_report.md`) reproduces identical hashes (`eval_result_hash`: `504c28e8...4c18`, `run_result_hash`: `b4370332...fd66`).
+- **Verification:** `170` automated tests pass (`pytest -q`, `17.53s`) and `ruff check .` passes cleanly in the development container; a second clean evaluation run (`reports/20261114T181200Z/eval_report.md`) reproduced identical hashes (`eval_result_hash`: `504c28e8...4c18`, `run_result_hash`: `b4370332...fd66`).
 - **Overall Out-of-Sample Verdict (`2010/11–2024/25`, weights `0.50 / 0.25 / 0.25`):** **NEGATIVE.** Minimax regret (`P2`) did **not** reduce held-out max regret compared to expected-loss (`P1b`) and did not outperform conventional average-climate optimization (`P1`):
   - **`P2` vs. `P1b` (primary):** **NEGATIVE** — test max regret `0.1744` (`P2`) vs. `0.1466` (`P1b`), median paired difference `D = +0.0064`, 95% CI `[-0.0609, +0.0375]`, Wilcoxon `p = 0.6875` (`7` non-overlapping pairs; `4` wins, `4` ties, `6` losses).
   - **`P2` vs. `P1` (secondary):** **NEGATIVE** — `P2` lowers test max regret (`0.1744` vs. `0.2811`) and has an average-climate price of robustness `M5 = 0.0080`, but performs worse in most test years (`2` wins, `4` ties, `8` losses; median `D = +0.0228`, 95% CI `[+0.0112, +0.0549]`). Using the **mean** CI (`[-0.0234, +0.0466]`) instead of the pre-selected median CI would make this comparison **INCONCLUSIVE**.
@@ -98,10 +98,10 @@ Other References:
 
 | Slide | Section | Content |
 |---|---|---|
-| **1** | **Title & Team** | **FieldShift Optimizer** — Explore and Compare Crop Rotation Trade-offs Under Climate Uncertainty<br>Challenge: *Field Shift: Adapting Farms with NASA Data* (`spaceappschallenge.org/2026/challenges/adapting-farms-with-nasa-data/`)<br>Team: `[RESULT PENDING: member names & roles]`<br>Public App & Repo: `[RESULT PENDING: URLs]` |
+| **1** | **Title & Team** | **FieldShift Optimizer** — Explore and Compare Crop Rotation Trade-offs Under Climate Uncertainty<br>Challenge: *Field Shift: Adapting Farms with NASA Data* (`spaceappschallenge.org/2026/challenges/adapting-farms-with-nasa-data/`)<br>Team: `[RESULT PENDING: member names & roles]`<br>Public Repo: `https://github.com/Marcux777/fieldshift-optimizer` (verify after push)<br>Public App: `[RESULT PENDING: live URL]` |
 | **2** | **The Challenge** | Rainfed 2-year rotation planning in Rio Verde (GO) faces rainfall and dry-spell uncertainty; average-climate plans can struggle in dry years, while worst-case plans can cost performance in typical years. |
 | **3** | **How NASA Data Makes It Possible** | NASA POWER Daily API (`v2.10.3`, `1981–2025`, `16,436` days, `PRECTOTCORR`, `T2M_MAX`, `T2M_MIN`) in a versioned offline snapshot enables 28 construction pairs (`1981/82–2009/10`) and 14 held-out test pairs (`2010/11–2024/25`). |
-| **4** | **Project Image & Architecture** | `[RESULT PENDING: clean screenshot of the FieldShift Optimizer Streamlit UI / Pareto frontier]`<br>ZARC `<= 20%` filter (`576` feasible plans) + 3-objective scoring (`g1`, `g2`, `g3`) + `P0 / P1 / P1b / P2` comparison + `36` Pareto plans (`6` distinct alternatives). |
+| **4** | **Project Image & Architecture** | Screenshots captured directly from the Streamlit app (`docs/assets/`): `app-pareto.png` (Pareto trade-off view) and `app-negative-evaluation.png` (honest negative evaluation view); additional captures: `app-nasa-sources.png`, `app-ad1-p0-infeasible.png`.<br>ZARC `<= 20%` filter (`576` feasible plans) + 3-objective scoring (`g1`, `g2`, `g3`) + `P0 / P1 / P1b / P2` comparison + `36` distinct non-dominated objective vectors (`50` plans with `14` vector ties; `6` distinct alternatives). |
 | **5** | **User Experience** | 3-step workflow: (1) select soil (`AD1–AD6` & texture) and baseline `P0`; (2) compare strategies & inspect Pareto trade-offs; (3) review 15-weight sensitivity, cost of robustness (`M5 = 0.0080`), assumptions, and data gaps. |
 | **6** | **Retrospective Evaluation & Caution** | **Honest Outcome: NEGATIVE.** `P2` vs. `P1b`: max regret `0.1744` vs. `0.1466` (median `D = +0.0064`, CI `[-0.0609, +0.0375]`). `P2` vs. `P1`: `2` wins, `4` ties, `8` losses. `P0` worst (`0.3196`).<br>Caution: supports—does not replace—farmer judgment; no promises of yield, profit, water, or soil; no claim of novelty. |
 | **7** | **References, SI Disclosure & Access** | Key sources (NASA POWER, MAPA ZARC, Agrodefesa, Embrapa), SI disclosure summary (`[RESULT PENDING: demo media SI status]`), and public no-login links (`[RESULT PENDING]`). |
@@ -112,7 +112,7 @@ Other References:
 |---|---|---|
 | **0:00–0:05** | Title card: `FieldShift Optimizer`, team names `[RESULT PENDING]` | "Rainfed farmers in Rio Verde, Brazil face tough two-year crop rotation choices under uncertain rainfall—where average-year plans and worst-case plans carry real trade-offs." |
 | **0:05–0:13** | NASA POWER snapshot card + ZARC calendar diagram | "FieldShift Optimizer combines 45 years of NASA POWER daily climate data with official Brazilian ZARC risk tables in a reproducible offline snapshot." |
-| **0:13–0:23** | Live app screen recording: inputs, Pareto chart, policy comparison `[RESULT PENDING]` | "Users compare their current plan against average-climate, expected-loss, and minimax regret strategies across climate exposure, cover continuity, and diversity." |
+| **0:13–0:23** | Live app screen recording / walkthrough using captured app views (`docs/assets/app-pareto.png`, `docs/assets/app-negative-evaluation.png`) | "Users compare their current plan against average-climate, expected-loss, and minimax regret strategies across climate exposure, cover continuity, and diversity." |
 | **0:23–0:30** | Evaluation card + Caution banner + public URL `[RESULT PENDING]` | "Our held-out test honestly reports a negative result: minimax regret did not beat expected loss. Built to support—never replace—farmer judgment." |
 
 ---

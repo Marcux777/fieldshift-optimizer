@@ -107,4 +107,5 @@ All datasets, agronomic documents, software libraries, and official challenge re
 
 ## 6. Demo & Visual Assets
 
-- `[RESULT PENDING]` (List any external diagrams, icons, fonts, or media used in the final 7-slide deck or 30-second video, or state "All visuals are screenshots/exports generated directly from the FieldShift Optimizer Streamlit application.")
+- Application screenshots captured directly from the FieldShift Optimizer Streamlit interface (`docs/assets/`): `app-pareto.png`, `app-negative-evaluation.png`, `app-nasa-sources.png`, `app-ad1-p0-infeasible.png`.
+- `[RESULT PENDING]` (Final 7-slide deck or 30-second video media link and any additional external visual/audio assets, if used.)

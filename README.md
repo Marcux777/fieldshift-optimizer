@@ -10,13 +10,14 @@ Project developed for the [NASA Space Apps Challenge 2026 — Field Shift: Adapt
 
 ## Status & Key Outcome
 
-- **Test Suite & Linter (verified in container `fieldshift-dev`):** `167 passed in 16.45s` (`pytest -q`); `ruff check .` passed (`All checks passed!`).
+- **Test Suite & Linter (verified in container `fieldshift-dev`):** `170 passed in 17.53s` (`pytest -q`); `ruff check .` passed (`All checks passed!`).
 - **Retrospective Evaluation Outcome (`2010/11–2024/25` held-out test):** **NEGATIVE.** On the frozen protocol (`v1.1`, `|X| = 576` feasible plans, weights `0.50 / 0.25 / 0.25`), minimax regret (`P2`) did **not** outperform expected-loss (`P1b`) or average-climate optimization (`P1`):
   - **`P2` vs. `P1b` (primary):** **NEGATIVE** — test max regret `0.1744` (`P2`) vs. `0.1466` (`P1b`), median paired difference `D = +0.0064`, 95% CI `[-0.0609, +0.0375]`, Wilcoxon `p = 0.6875` (`7` non-overlapping pairs).
   - **`P2` vs. `P1` (secondary):** **NEGATIVE** — `P2` lowers test max regret (`0.1744` vs. `0.2811`) but performs worse in most test years (`2` wins, `4` ties, `8` losses; median `D = +0.0228`, 95% CI `[+0.0112, +0.0549]`). Using the **mean** CI (`[-0.0234, +0.0466]`) instead of the median would classify this comparison as **INCONCLUSIVE**.
   - **`P0` (current baseline):** Viable under ZARC (`<= 20%`), but worst on the test set (max regret `0.3196`, `0` years within `ε = 0.02`).
   - **15-weight sensitivity grid (`P2` vs. `P1b`):** **NEGATIVE** in `8` points and **INCONCLUSIVE** in `7` points (`0` sustained).
-- **What the App Delivers:** Rather than claiming minimax regret "wins," FieldShift Optimizer provides a transparent, reproducible tool to **compare** rotation strategies side by side, **explore** the Pareto frontier (`36` non-dominated plans; `6` distinct crop-signature alternatives), inspect the price of robustness in average climate (`M5 = 0.0080`), and see honestly when robustness did **not** pay off out-of-sample.
+- **What the App Delivers:** Rather than claiming minimax regret "wins," FieldShift Optimizer provides a transparent, reproducible tool to **compare** rotation strategies side by side, **explore** the Pareto frontier (`36` distinct non-dominated objective vectors; `50` plans including `14` vector ties; `6` distinct crop-signature alternatives), inspect the price of robustness in average climate (`M5 = 0.0080`), and see honestly when robustness did **not** pay off out-of-sample.
+- **Public Repository:** https://github.com/Marcux777/fieldshift-optimizer (created; verify after push)
 - **Live Deployment URL:** `[RESULT PENDING]`
 
 ---
@@ -112,7 +113,7 @@ fieldshift-optimizer/
 
 ## Verification & Reproducibility Hashes
 
-- **Test Suite (`docker compose exec -T dev pytest -q`):** `167 passed in 16.45s`
+- **Test Suite (`docker compose exec -T dev pytest -q`):** `170 passed in 17.53s`
 - **Linter (`docker compose exec -T dev ruff check .`):** `All checks passed!`
 - **Snapshot ID:** `power-daily-2.10.3-lat-18_lon-50.625-46c276253b44` (`manifest.json` SHA-256: `2de4764ad0c1a25f85d3989488d175236171db89505705c8c9f3f69f50f2d76b`)
 - **Protocol v1.1 SHA-256:** `ee8e51c5b2eecc7319818a5645ef15b84d677eabab35caad1a7e9fc41deaefb9`
