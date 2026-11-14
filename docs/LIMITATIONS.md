@@ -9,7 +9,7 @@ FieldShift Optimizer is a transparent decision-support prototype. The limitation
 - **Supports, Does Not Replace, the Farmer:** Outputs are comparative indicators under historical weather records, not agronomic prescriptions. Local field conditions, operational capacity, machinery availability, pest pressure, and market context remain the farmer's and agronomist's responsibility.
 - **No Outcome Guarantees:** The tool does **not** predict or promise crop yield, farm profit, water savings, soil recovery, carbon sequestration, or pest suppression.
 - **No Legal/Insurance ZARC Compliance Claim:** Although the model filters sowing windows using the official ZARC 2026/27 risk table, users must consult the official MAPA *Painel ZARC* for agricultural credit or insurance (PROAGRO/PSR) eligibility.
-- **No Claim of Scientific Novelty or Universal Superiority:** The system combines established multi-objective optimization, minimax regret, and public datasets. We do not claim unprecedented scientific originality or that minimax regret outperforms other strategies in general.
+- **No Claim of Scientific Novelty or Method Superiority:** The system combines established multi-objective optimization, minimax regret, and public datasets. In our held-out retrospective test (`2010/11–2024/25`), minimax regret (`P2`) did **not** outperform expected-loss (`P1b`) or average-climate optimization (`P1`)—an explicitly reported **NEGATIVE** outcome.
 
 ---
 
@@ -34,7 +34,7 @@ The following parameters are explicit modeling hypotheses frozen for the MVP rat
 
 ## 3. Spatial, Temporal, and Data Scope Limits
 
-- **Single NASA POWER Grid Cell:** Rio Verde is represented by a single grid cell `(-18.0, -50.625)` (inferred ~`0.5° × 0.625°` MERRA-2 resolution). Neighboring cells within the municipality show different annual rainfall totals (`1350 mm` vs. `1428 mm` in preliminary checks).
+- **Single NASA POWER Grid Cell:** Rio Verde is represented by a single grid cell `(-18.0, -50.625)` (inferred ~`0.5° × 0.625°` MERRA-2 resolution). Neighboring cells within the municipality show different annual rainfall totals (`1350 mm` vs. `1428 mm` in preliminary checks); the neighboring cell was not evaluated in this run.
 - **Rainfed, 2-Year × 4-Window Horizon:** Irrigated systems, multi-year perennial transitions beyond 2 years, and crops outside the closed 5-crop + fallow Group I catalog are not modeled.
 - **Excluded Climate Variables:** Solar radiation (`ALLSKY_SFC_SW_DWN`, unavailable for `1981–1983`) and potential evapotranspiration (`PET` returns HTTP 422 in POWER API) are excluded, so `g1` relies solely on precipitation and temperature (`PRECTOTCORR`, `T2M_MAX`, `T2M_MIN`), and `g2`/`g3` are calendar/species proxies rather than biophysical soil-water or carbon simulations.
 - **Excluded NASA Datasets:** `IMERG`, `SMAP`, and `MODIS` require Earthdata credentials and are outside the MVP.
@@ -48,6 +48,10 @@ The following parameters are explicit modeling hypotheses frozen for the MVP rat
 
 ---
 
-## 5. Evaluation & Statistical Power Limits
+## 5. Evaluation, Statistical Power, and Protocol Deviations
 
-- `[RESULT PENDING]` (To be completed from `reports/` after the final integrated evaluation run, including exact test-period sample size, dry-year distribution relative to construction `P25`, block-bootstrap power with 7 non-overlapping blocks, and observed negative/inconclusive/positive outcomes.)
+- **Low Statistical Power:** The held-out test period (`2010/11–2024/25`, `14` two-year pairs) yields only `7` non-overlapping 2-pair blocks for the block bootstrap (`10,000` replicates, seed `20261114`) and `7` non-overlapping pairs for the Wilcoxon signed-rank test.
+- **Dry-Year Threshold Skew:** `12` of the `14` test pairs fell below the construction dry-year threshold (`P25 Oct–Mar = 1098.9 mm`), so `M3` barely separates dry years from normal years in the test window.
+- **Leave-One-Pair-Out (`M4c`) Simplification:** `M4c` keeps the full-construction `e3` medians fixed rather than recomputing them per leave-one-out fold (declared simplification).
+- **Confidence Interval Choice (`Median` vs. `Mean`):** The frozen protocol (`v1.1`) specified "CI of `D`" without specifying median vs. mean. The evaluation code selected the **median** CI of `D` before the first run. For `P2` vs. `P1`, the median CI `[+0.0112, +0.0549]` is entirely above zero (**NEGATIVE**), whereas the mean CI `[-0.0234, +0.0466]` spans zero (which would be **INCONCLUSIVE**). Both CIs are reported in `reports/20261114T181200Z/eval_report.md`.
+- **Protocol Transparency Note (First Run):** The frozen configuration hash (`067e569ec333fc7b7dcff85d925732f3746bf2f6525fd7f4d38e6935f64cbad1`) was written to `reports/FROZEN_CONFIG.json` on the first run (`20261114T181122Z`) rather than published in the coordination channel beforehand. Both runs (`20261114T181122Z` and `20261114T181200Z`) produced identical evaluation and `RunResult` hashes.

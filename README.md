@@ -1,17 +1,22 @@
 # FieldShift Optimizer
 
-**Robust Crop Rotation Decisions Under Climate Uncertainty**
+**Explore and Compare Crop Rotation Trade-offs Under Climate Uncertainty**
 
 Project developed for the [NASA Space Apps Challenge 2026 — Field Shift: Adapting Farms with NASA Data](https://www.spaceappschallenge.org/2026/challenges/adapting-farms-with-nasa-data/).
 
-> **Decision-Support Notice:** FieldShift Optimizer **supports—and does not replace—the farmer's judgment** or local agronomic assistance. It does **not** promise or guarantee crop yield, profit, water savings, or soil recovery, and makes **no claim of unprecedented scientific novelty**.
+> **Decision-Support Notice:** FieldShift Optimizer **supports—and does not replace—the farmer's judgment** or local agronomic assistance. It does **not** promise or guarantee crop yield, profit, water savings, or soil recovery, and makes **no claim of unprecedented scientific novelty** or method superiority.
 
 ---
 
-## Status
+## Status & Key Outcome
 
-- **Data & Core Modules:** Implemented (`src/fieldshift/`), using a versioned offline NASA POWER snapshot (`power-daily-2.10.3-lat-18_lon-50.625-46c276253b44`).
-- **Tests & Evaluation Results:** `[RESULT PENDING]` (awaiting final integrated run, test suite verification, and evaluation report).
+- **Test Suite & Linter (verified in container `fieldshift-dev`):** `167 passed in 16.45s` (`pytest -q`); `ruff check .` passed (`All checks passed!`).
+- **Retrospective Evaluation Outcome (`2010/11–2024/25` held-out test):** **NEGATIVE.** On the frozen protocol (`v1.1`, `|X| = 576` feasible plans, weights `0.50 / 0.25 / 0.25`), minimax regret (`P2`) did **not** outperform expected-loss (`P1b`) or average-climate optimization (`P1`):
+  - **`P2` vs. `P1b` (primary):** **NEGATIVE** — test max regret `0.1744` (`P2`) vs. `0.1466` (`P1b`), median paired difference `D = +0.0064`, 95% CI `[-0.0609, +0.0375]`, Wilcoxon `p = 0.6875` (`7` non-overlapping pairs).
+  - **`P2` vs. `P1` (secondary):** **NEGATIVE** — `P2` lowers test max regret (`0.1744` vs. `0.2811`) but performs worse in most test years (`2` wins, `4` ties, `8` losses; median `D = +0.0228`, 95% CI `[+0.0112, +0.0549]`). Using the **mean** CI (`[-0.0234, +0.0466]`) instead of the median would classify this comparison as **INCONCLUSIVE**.
+  - **`P0` (current baseline):** Viable under ZARC (`<= 20%`), but worst on the test set (max regret `0.3196`, `0` years within `ε = 0.02`).
+  - **15-weight sensitivity grid (`P2` vs. `P1b`):** **NEGATIVE** in `8` points and **INCONCLUSIVE** in `7` points (`0` sustained).
+- **What the App Delivers:** Rather than claiming minimax regret "wins," FieldShift Optimizer provides a transparent, reproducible tool to **compare** rotation strategies side by side, **explore** the Pareto frontier (`36` non-dominated plans; `6` distinct crop-signature alternatives), inspect the price of robustness in average climate (`M5 = 0.0080`), and see honestly when robustness did **not** pay off out-of-sample.
 - **Live Deployment URL:** `[RESULT PENDING]`
 
 ---
@@ -22,11 +27,7 @@ Project developed for the [NASA Space Apps Challenge 2026 — Field Shift: Adapt
 - **NASA Climate Data:** Versioned offline snapshot from NASA POWER Daily Point API (`v2.10.3`, `MERRA2` + `POWER`, cell `-18.0, -50.625`, `1981-01-01` to `2025-12-31`, `PRECTOTCORR`, `T2M`, `T2M_MAX`, `T2M_MIN`).
 - **Agronomic Constraints:** Official ZARC 2026/27 risk-zoning table for Rio Verde (fixed `<= 20%` risk threshold), Group I cycle per crop (soybean, 1st-season corn, 2nd-season corn, 2nd-season corn + brachiaria, 2nd-season grain sorghum, and fallow only when no 2nd crop is feasible), and Goiás soybean legal sowing/sanitary-void rules (`IN Agrodefesa 6/2024`).
 - **Multi-Objective Optimization & Pareto Frontier:** Three objectives in `[0, 1]` (climate exposure `g1`, vegetation cover discontinuity `g2`, crop diversity deficit `g3`), default weights `0.50 / 0.25 / 0.25` plus a 15-point sensitivity grid.
-- **Policy Comparison:** Side-by-side comparison of:
-  - `P0`: Current baseline plan (user-configurable; default hypothesis: soybean in `dec29` + 2nd-season corn)
-  - `P1`: Conventional optimization under average construction climate
-  - `P1b`: Expected-loss optimization across construction scenarios
-  - `P2`: Minimax regret optimization across construction scenarios
+- **Policy Comparison:** Side-by-side comparison of `P0` (current plan), `P1` (average-climate optimization), `P1b` (expected-loss optimization), and `P2` (minimax regret).
 - **Retrospective Evaluation:** Strict temporal split (`1981/82–2009/10` construction, 28 two-year pairs; `2010/11–2024/25` held-out test, 14 two-year pairs) with independent loss recomputation and leakage checks.
 - **Interface:** Streamlit web application displaying sources, assumptions, trade-offs, and limitations.
 
@@ -109,11 +110,14 @@ fieldshift-optimizer/
 
 ---
 
-## Verification & Results
+## Verification & Reproducibility Hashes
 
-- **Test Suite (`pytest -q`):** `[RESULT PENDING]`
-- **Evaluation Outcome (`P2` vs. `P1b` / `P1` / `P0`):** `[RESULT PENDING]`
-- **Result & RunResult Hashes:** `[RESULT PENDING]`
+- **Test Suite (`docker compose exec -T dev pytest -q`):** `167 passed in 16.45s`
+- **Linter (`docker compose exec -T dev ruff check .`):** `All checks passed!`
+- **Snapshot ID:** `power-daily-2.10.3-lat-18_lon-50.625-46c276253b44` (`manifest.json` SHA-256: `2de4764ad0c1a25f85d3989488d175236171db89505705c8c9f3f69f50f2d76b`)
+- **Protocol v1.1 SHA-256:** `ee8e51c5b2eecc7319818a5645ef15b84d677eabab35caad1a7e9fc41deaefb9`
+- **Evaluation Result Hash (`reports/20261114T181122Z/` & `20261114T181200Z/`):** `504c28e85e54cbd4e9470e8a423499299dcbed643cb9b2ff8aa461873e134c18`
+- **RunResult Hash:** `b43703326690e6d0ddd2be48641fbdb9ba46908810ebfca0c8c90a379c79fd66`
 
 ---
 
