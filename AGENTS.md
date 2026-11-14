@@ -15,6 +15,7 @@ FieldShift Optimizer: app web (Streamlit) de apoio à decisão para rotação de
 
 | Assunto | Fonte |
 | --- | --- |
+| Decisões do cliente, escopo técnico congelado | `docs/DECISIONS.md` |
 | Escopo, critérios de aceite, equipe | `docs/planning/BRIEFING.md` |
 | Regras oficiais, submissão, uso de SI | `docs/HACKATHON_RULES.md` |
 | Fluxo, cronograma, responsáveis | `docs/WORKFLOW.md` |
@@ -33,7 +34,7 @@ FieldShift Optimizer: app web (Streamlit) de apoio à decisão para rotação de
 
 ## Comandos
 
-Decisão do usuário (13/11): todo Python (instalação, testes, lint, app) roda em container Docker do projeto, com Python 3.12 e uv dentro da imagem. Não criar ambiente Python no host. Antes do primeiro comando ou arquivo Docker, ler `~/.codex/instructions/docker.md`. Plano em `docs/planning/` (cópia de `prep/container-plan.md` entra em 14/11). Dockerfile, Compose e dependências entram a partir de 14/11 às 9h.
+Escopo técnico congelado em `docs/DECISIONS.md`; leia antes de qualquer mudança. Instalação, testes, lint e app rodam em container Docker do projeto (Python 3.12 e uv na imagem), sem ambiente Python no host, a pedido do usuário em 13/11. O deploy não usa Docker: é direto no Streamlit Community Cloud, então o repositório traz a lista de dependências e o snapshot. Antes do primeiro comando ou arquivo Docker, ler `~/.codex/instructions/docker.md`. Dockerfile, Compose e dependências entram a partir de 14/11 às 9h.
 
 ## Regras do projeto
 

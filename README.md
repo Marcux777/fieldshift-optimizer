@@ -20,6 +20,7 @@ Apoio à decisão, que não substitui o agricultor nem a assistência agronômic
 ## Documentação
 
 - [`AGENTS.md`](AGENTS.md): regras e estrutura para agentes.
+- [`docs/DECISIONS.md`](docs/DECISIONS.md): decisões do cliente e escopo técnico congelado.
 - [`docs/planning/BRIEFING.md`](docs/planning/BRIEFING.md): escopo, equipe e critérios de aceite.
 - [`docs/HACKATHON_RULES.md`](docs/HACKATHON_RULES.md): regras oficiais verificadas.
 - [`docs/WORKFLOW.md`](docs/WORKFLOW.md): cronograma e responsáveis.
