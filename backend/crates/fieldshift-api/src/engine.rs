@@ -17,7 +17,12 @@ use fieldshift_model::{
 use fieldshift_numeric::canon::sha256_hex;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::{collections::BTreeMap, fs, path::Path};
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::Path,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -90,6 +95,10 @@ pub struct Engine {
     climate: ClimateFrame,
     daily: ClimateDaily,
     pub protocol_sha256: String,
+    pub default_config_hash: String,
+    run_calls: AtomicUsize,
+    evaluate_calls: AtomicUsize,
+    plans_calls: AtomicUsize,
 }
 impl Engine {
     pub fn load(root: &Path) -> Result<Self> {
@@ -132,6 +141,16 @@ impl Engine {
             protocol_sha256 == fieldshift_eval::evaluation::PROTOCOL_SHA256,
             "Frozen protocol hash differs; refusing to calculate"
         );
+        let default_soil = catalog::load_soil(&soil_toml, Some("AD4"), Some("argilosa"))?;
+        let default_config_hash = optimization::compute_config_hash(
+            &catalog,
+            &default_soil,
+            &params,
+            fieldshift_model::selection::DEFAULT_WEIGHTS,
+            &catalog.default_p0,
+            fieldshift_model::pareto::K_ALTERNATIVES,
+            fieldshift_model::pareto::MIN_HAMMING,
+        );
         Ok(Self {
             catalog,
             manifest,
@@ -141,8 +160,29 @@ impl Engine {
             climate,
             daily,
             protocol_sha256,
+            default_config_hash,
+            run_calls: AtomicUsize::new(0),
+            evaluate_calls: AtomicUsize::new(0),
+            plans_calls: AtomicUsize::new(0),
         })
     }
+    pub fn is_default_inputs(&self, i: &Inputs) -> bool {
+        i.ad_class == "AD4"
+            && i.texture == "argilosa"
+            && i.weights == fieldshift_model::selection::DEFAULT_WEIGHTS
+            && match &i.p0 {
+                None => true,
+                Some(p) => p.spec() == self.catalog.default_p0,
+            }
+    }
+    pub fn call_counts(&self) -> (usize, usize, usize) {
+        (
+            self.run_calls.load(Ordering::SeqCst),
+            self.evaluate_calls.load(Ordering::SeqCst),
+            self.plans_calls.load(Ordering::SeqCst),
+        )
+    }
+    #[doc(hidden)]
     pub fn with_truncated_climate(mut self, rows: usize) -> Result<Self> {
         let len = rows.min(self.daily.dates.len());
         self.daily.dates.truncate(len);
@@ -166,6 +206,7 @@ impl Engine {
         }))?;
         Ok(self)
     }
+    #[doc(hidden)]
     pub fn with_infeasible_zarc(mut self) -> Self {
         for risks in self.catalog.zarc.values_mut() {
             *risks = [40; 36];
@@ -184,6 +225,7 @@ impl Engine {
                 self.catalog.index_of(k).map_err(|e| e.to_string())?;
             }
         }
+        self.run_calls.fetch_add(1, Ordering::SeqCst);
         let snapshot_id = self.manifest["snapshot_id"]
             .as_str()
             .ok_or("Snapshot ID missing")?;
@@ -211,6 +253,7 @@ impl Engine {
     pub fn evaluate(&self, i: &Inputs) -> Result<Value, String> {
         let rr = self.run(i)?;
         let soil = self.soil(i)?;
+        self.evaluate_calls.fetch_add(1, Ordering::SeqCst);
         let (plans, _) =
             catalog::enumerate_plans(&self.catalog, &soil, 0.20).map_err(|e| e.to_string())?;
         let infos = plan_infos(&plans);
@@ -276,6 +319,7 @@ impl Engine {
     }
     pub fn plans(&self, i: &Inputs) -> Result<Value, String> {
         let soil = self.soil(i)?;
+        self.plans_calls.fetch_add(1, Ordering::SeqCst);
         let (plans, rejections) =
             catalog::enumerate_plans(&self.catalog, &soil, 0.20).map_err(|e| e.to_string())?;
         Ok(json!({"status":if plans.is_empty(){"INVIAVEL"}else{"OK"},

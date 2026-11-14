@@ -10,17 +10,35 @@ use axum::{
 use engine::{Engine, Inputs};
 use serde_json::{json, Value};
 use std::{path::PathBuf, sync::Arc, time::Duration};
-use tokio::sync::Semaphore;
+use tokio::sync::{OnceCell, Semaphore};
 use tower_http::{
     cors::CorsLayer,
     services::{ServeDir, ServeFile},
     trace::TraceLayer,
 };
 
+#[derive(Default)]
+struct DefaultCache {
+    run: OnceCell<Value>,
+    evaluate: OnceCell<Value>,
+    plans: OnceCell<Value>,
+}
+
 #[derive(Clone)]
 struct AppState {
     engine: Arc<Engine>,
     slots: Arc<Semaphore>,
+    default_cache: Arc<DefaultCache>,
+}
+
+pub fn resolve_bind_address(bind_address: Option<&str>, port: Option<&str>) -> String {
+    if let Some(bind) = bind_address.map(str::trim).filter(|s| !s.is_empty()) {
+        return bind.to_string();
+    }
+    if let Some(p) = port.map(str::trim).filter(|s| !s.is_empty()) {
+        return format!("0.0.0.0:{p}");
+    }
+    "127.0.0.1:3000".to_string()
 }
 #[derive(Debug)]
 struct ApiError(StatusCode, &'static str, String);
@@ -39,18 +57,38 @@ fn input(value: Result<Json<Inputs>, JsonRejection>) -> Result<Inputs, ApiError>
         .map_err(|e| ApiError(StatusCode::UNPROCESSABLE_ENTITY, "INVALID_INPUT", e))?;
     Ok(i)
 }
-async fn calculate(
+async fn execute_engine(
     s: AppState,
     i: Inputs,
     operation: &'static str,
-) -> Result<Json<Value>, ApiError> {
-    let permit = s.slots.clone().try_acquire_owned().map_err(|_| {
-        ApiError(
-            StatusCode::TOO_MANY_REQUESTS,
-            "BUSY",
-            "Two computations are already running; retry later".into(),
-        )
-    })?;
+    wait_for_slot: bool,
+) -> Result<Value, ApiError> {
+    let permit = if wait_for_slot {
+        tokio::time::timeout(Duration::from_secs(120), s.slots.clone().acquire_owned())
+            .await
+            .map_err(|_| {
+                ApiError(
+                    StatusCode::GATEWAY_TIMEOUT,
+                    "TIMEOUT",
+                    "Computation exceeded 120s".into(),
+                )
+            })?
+            .map_err(|_| {
+                ApiError(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "INTERNAL",
+                    "Computation semaphore closed".into(),
+                )
+            })?
+    } else {
+        s.slots.clone().try_acquire_owned().map_err(|_| {
+            ApiError(
+                StatusCode::TOO_MANY_REQUESTS,
+                "BUSY",
+                "Two computations are already running; retry later".into(),
+            )
+        })?
+    };
     let job = tokio::task::spawn_blocking(move || {
         let _permit = permit;
         match operation {
@@ -63,7 +101,7 @@ async fn calculate(
             _ => s.engine.run_value(&i),
         }
     });
-    let value = tokio::time::timeout(Duration::from_secs(120), job)
+    tokio::time::timeout(Duration::from_secs(120), job)
         .await
         .map_err(|_| {
             ApiError(
@@ -80,8 +118,50 @@ async fn calculate(
                 "Computation worker failed".into(),
             )
         })?
-        .map_err(|e| ApiError(StatusCode::UNPROCESSABLE_ENTITY, "COMPUTATION", e))?;
-    Ok(Json(value))
+        .map_err(|e| ApiError(StatusCode::UNPROCESSABLE_ENTITY, "COMPUTATION", e))
+}
+
+async fn calculate(
+    s: AppState,
+    i: Inputs,
+    operation: &'static str,
+) -> Result<Json<Value>, ApiError> {
+    if s.engine.is_default_inputs(&i) {
+        let val = match operation {
+            "evaluate" => s
+                .default_cache
+                .evaluate
+                .get_or_try_init(|| execute_engine(s.clone(), i, "evaluate", true))
+                .await?
+                .clone(),
+            "plans" => s
+                .default_cache
+                .plans
+                .get_or_try_init(|| execute_engine(s.clone(), i, "plans", true))
+                .await?
+                .clone(),
+            "pareto" => {
+                let v = s
+                    .default_cache
+                    .run
+                    .get_or_try_init(|| execute_engine(s.clone(), i, "run", true))
+                    .await?;
+                json!({
+                    "pareto": v["pareto"],
+                    "objectives": v["objectives"],
+                    "alternatives": v["alternatives"]
+                })
+            }
+            _ => s
+                .default_cache
+                .run
+                .get_or_try_init(|| execute_engine(s.clone(), i, "run", true))
+                .await?
+                .clone(),
+        };
+        return Ok(Json(val));
+    }
+    Ok(Json(execute_engine(s, i, operation, false).await?))
 }
 async fn health() -> Json<Value> {
     Json(json!({"status":"ok","language":"Rust","mode":"computed",
@@ -119,13 +199,12 @@ async fn provenance(State(s): State<AppState>) -> Json<Value> {
     "quality":s.engine.quality,"protocol_sha256":s.engine.protocol_sha256,
     "source":"verified NASA POWER raw JSON; computed in Rust"}))
 }
-async fn meta(State(s): State<AppState>) -> Result<Json<Value>, ApiError> {
-    let r = calculate(s.clone(), Inputs::default(), "run").await?.0;
-    Ok(Json(
+async fn meta(State(s): State<AppState>) -> Json<Value> {
+    Json(
         json!({"version":env!("CARGO_PKG_VERSION"),"language":"Rust","mode":"computed",
         "protocol_version":"1.1","snapshot_id":s.engine.manifest["snapshot_id"],
-        "config_hash":r["config_hash"],"protocol_sha256":s.engine.protocol_sha256}),
-    ))
+        "config_hash":s.engine.default_config_hash,"protocol_sha256":s.engine.protocol_sha256}),
+    )
 }
 async fn limitations() -> Json<Value> {
     Json(json!({"items":[
@@ -162,9 +241,18 @@ async fn openapi() -> Json<Value> {
 }
 
 pub fn router(engine: Engine, static_dir: Option<PathBuf>, origins: Vec<HeaderValue>) -> Router {
+    router_with_engine(Arc::new(engine), static_dir, origins)
+}
+
+pub fn router_with_engine(
+    engine: Arc<Engine>,
+    static_dir: Option<PathBuf>,
+    origins: Vec<HeaderValue>,
+) -> Router {
     let state = AppState {
-        engine: Arc::new(engine),
+        engine,
         slots: Arc::new(Semaphore::new(2)),
+        default_cache: Arc::new(DefaultCache::default()),
     };
     let api = Router::new()
         .route("/health", get(health))

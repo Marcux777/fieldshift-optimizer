@@ -1,7 +1,7 @@
 // AI-assisted (OpenBot agent)
 use anyhow::{Context, Result};
 use axum::http::HeaderValue;
-use fieldshift_api::{engine::Engine, router};
+use fieldshift_api::{engine::Engine, resolve_bind_address, router};
 use std::{env, path::PathBuf};
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -22,7 +22,10 @@ async fn main() -> Result<()> {
         .collect::<Result<Vec<_>, _>>()
         .context("Invalid FRONTEND_ORIGIN")?;
     let static_dir = env::var_os("FIELDSHIFT_STATIC_DIR").map(PathBuf::from);
-    let bind = env::var("BIND_ADDRESS").unwrap_or_else(|_| "127.0.0.1:3000".into());
+    let bind = resolve_bind_address(
+        env::var("BIND_ADDRESS").ok().as_deref(),
+        env::var("PORT").ok().as_deref(),
+    );
     let listener = tokio::net::TcpListener::bind(&bind).await?;
     tracing::info!(%bind,"Serving computed Rust scientific results");
     axum::serve(listener, router(engine, static_dir, origins)).await?;

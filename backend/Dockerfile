@@ -29,7 +29,7 @@ COPY data/snapshots/ /app/data/snapshots/
 COPY docs/EVALUATION_PROTOCOL.md /app/docs/EVALUATION_PROTOCOL.md
 COPY docs/LIMITATIONS.md docs/REFERENCES.md docs/DATA_SOURCES.md /app/docs/
 COPY backend/Cargo.lock /app/backend/Cargo.lock
-ENV FIELDSHIFT_ROOT=/app FIELDSHIFT_STATIC_DIR=/app/frontend/build BIND_ADDRESS=0.0.0.0:3000 PORT=3000
+ENV FIELDSHIFT_ROOT=/app FIELDSHIFT_STATIC_DIR=/app/frontend/build PORT=3000
 EXPOSE 3000
 USER 65534:65534
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD curl --fail --silent "http://127.0.0.1:${PORT}/v1/health" || exit 1

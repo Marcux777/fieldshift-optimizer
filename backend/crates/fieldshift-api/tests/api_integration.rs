@@ -14,7 +14,7 @@ use axum::{
 };
 use fieldshift_api::{
     engine::{CurrentPlan, Engine, Inputs},
-    router,
+    resolve_bind_address, router, router_with_engine,
 };
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
@@ -477,5 +477,148 @@ async fn boundary_validation_and_ported_pipeline_cases() {
         }
         .validate(),
         Ok(())
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn concurrent_default_requests_single_flight_and_bind_address_resolution() {
+    use std::sync::Arc;
+
+    // O3: BIND_ADDRESS precedence over PORT, and 0.0.0.0:$PORT fallback.
+    assert_eq!(
+        resolve_bind_address(Some("127.0.0.1:3100"), Some("10000")),
+        "127.0.0.1:3100"
+    );
+    assert_eq!(resolve_bind_address(None, Some("10000")), "0.0.0.0:10000");
+    assert_eq!(
+        resolve_bind_address(Some("  "), Some("4100")),
+        "0.0.0.0:4100"
+    );
+    assert_eq!(resolve_bind_address(None, None), "127.0.0.1:3000");
+
+    // O1 + O2: 16 concurrent page-load bursts with default inputs (both implicit `{}` and explicit default_p0)
+    // must never return 429 BUSY and must deduplicate heavy computations via single-flight + deterministic cache,
+    // without mixing configurations or masking invalid inputs.
+    let engine = Arc::new(Engine::load(&repo_root()).expect("engine loads"));
+    let app = router_with_engine(engine.clone(), None, Vec::new());
+
+    // 1. /v1/meta uses precomputed default_config_hash without triggering any engine run.
+    let (st_meta, meta_body) = get_json(&app, "/v1/meta").await;
+    assert_eq!(st_meta, StatusCode::OK);
+    assert_eq!(
+        meta_body["config_hash"],
+        load_fixture("golden_run_result.json")["config_hash"]
+    );
+    assert_eq!(engine.call_counts(), (0, 0, 0));
+
+    // 2. Fire 16 concurrent bursts (each doing /v1/meta, /v1/run {}, /v1/run explicit, /v1/evaluate {},
+    //    /v1/evaluate explicit, /v1/plans {}, /v1/pareto {}) plus a concurrent non-default AD1 request
+    //    and an invalid AD9 request.
+    let mut handles = Vec::new();
+    for idx in 0..16usize {
+        let app_c = app.clone();
+        handles.push(tokio::spawn(async move {
+            let explicit_default = json!({
+                "ad_class": "AD4",
+                "texture": "argilosa",
+                "weights": [0.5, 0.25, 0.25],
+                "p0": {
+                    "j1": "soja",
+                    "dec1": 29,
+                    "j2": "milho_2a",
+                    "j3": "soja",
+                    "dec3": 29,
+                    "j4": "milho_2a"
+                }
+            });
+            let run_payload = if idx % 2 == 0 {
+                json!({})
+            } else {
+                explicit_default.clone()
+            };
+            let eval_payload = if idx % 2 == 1 {
+                json!({})
+            } else {
+                explicit_default
+            };
+
+            let (m_st, m_val) = get_json(&app_c, "/v1/meta").await;
+            let (r_st, r_val) = post_json(&app_c, "/v1/run", &run_payload).await;
+            let (e_st, e_val) = post_json(&app_c, "/v1/evaluate", &eval_payload).await;
+            let (p_st, p_val) = post_json(&app_c, "/v1/plans", &json!({})).await;
+            let (pa_st, pa_val) = post_json(&app_c, "/v1/pareto", &json!({})).await;
+
+            assert_eq!(m_st, StatusCode::OK, "burst {idx} meta failed");
+            assert_eq!(r_st, StatusCode::OK, "burst {idx} run failed: {r_val}");
+            assert_eq!(e_st, StatusCode::OK, "burst {idx} evaluate failed: {e_val}");
+            assert_eq!(p_st, StatusCode::OK, "burst {idx} plans failed: {p_val}");
+            assert_eq!(pa_st, StatusCode::OK, "burst {idx} pareto failed: {pa_val}");
+
+            assert_eq!(
+                r_val["result_hash"],
+                "b43703326690e6d0ddd2be48641fbdb9ba46908810ebfca0c8c90a379c79fd66"
+            );
+            assert_eq!(
+                e_val["result_hash"],
+                "504c28e85e54cbd4e9470e8a423499299dcbed643cb9b2ff8aa461873e134c18"
+            );
+            assert_eq!(e_val["outcome"], "NEGATIVO");
+            assert_eq!(p_val["n_plans"], 576);
+            assert_eq!(pa_val["pareto"]["n_front"], 36);
+            assert_eq!(m_val["config_hash"], r_val["config_hash"]);
+        }));
+    }
+
+    let app_ad1 = app.clone();
+    let ad1_handle = tokio::spawn(async move {
+        post_json(
+            &app_ad1,
+            "/v1/plans",
+            &json!({
+                "ad_class": "AD1",
+                "texture": "argilosa",
+                "weights": [0.5, 0.25, 0.25]
+            }),
+        )
+        .await
+    });
+
+    let app_bad = app.clone();
+    let bad_handle = tokio::spawn(async move {
+        post_json(
+            &app_bad,
+            "/v1/run",
+            &json!({
+                "ad_class": "AD9",
+                "texture": "argilosa",
+                "weights": [0.5, 0.25, 0.25]
+            }),
+        )
+        .await
+    });
+
+    for h in handles {
+        h.await.expect("concurrent default task panicked");
+    }
+    let (st_ad1, val_ad1) = ad1_handle.await.expect("ad1 task");
+    assert_eq!(st_ad1, StatusCode::OK);
+    assert_eq!(val_ad1["n_plans"], 169);
+
+    let (st_bad, val_bad) = bad_handle.await.expect("bad task");
+    assert_eq!(st_bad, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(val_bad["error"]["code"], "INVALID_INPUT");
+
+    // Verify single-flight deduplication: across 16 concurrent bursts (32 run/pareto calls, 16 evaluate calls,
+    // 16 plans calls + 1 AD1 plans call), default evaluate ran once, default plans ran once (+1 AD1 = 2),
+    // and engine.run ran twice (1 for default run/pareto + 1 inside default evaluate).
+    let (run_calls, evaluate_calls, plans_calls) = engine.call_counts();
+    assert_eq!(evaluate_calls, 1, "default evaluate must run exactly once");
+    assert_eq!(
+        run_calls, 2,
+        "default run must run once for run/pareto and once inside evaluate"
+    );
+    assert_eq!(
+        plans_calls, 2,
+        "plans must run once for default AD4 and once for non-default AD1"
     );
 }

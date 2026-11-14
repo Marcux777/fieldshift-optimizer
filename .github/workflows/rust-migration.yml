@@ -2,7 +2,7 @@
 name: Rust migration
 on:
   push:
-    branches: [feat/rust-svelte-migration]
+    branches: [main, feat/rust-svelte-migration]
   pull_request:
     paths: ['backend/**', 'frontend/**', 'fixtures/reference/**', 'config/**', 'data/snapshots/**', '.github/workflows/rust-migration.yml']
 permissions:
@@ -90,3 +90,9 @@ jobs:
           curl --fail http://127.0.0.1:3000/v1/health
           curl --fail http://127.0.0.1:3000/
           docker exec fieldshift-ci sh -c 'test "$(id -u)" != 0 && ! command -v python && ! command -v python3 && test ! -d /app/reports && test ! -d /app/fixtures'
+          docker run --name fieldshift-ci-port -d -e PORT=4100 -p 127.0.0.1:4100:4100 fieldshift:ci
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4100/v1/health; then break; fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:4100/v1/health
