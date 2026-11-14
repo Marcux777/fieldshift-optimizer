@@ -17,7 +17,7 @@ Project developed for the [NASA Space Apps Challenge 2026 — Field Shift: Adapt
   - **`P0` (current baseline):** Viable under ZARC (`<= 20%`), but worst on the test set (max regret `0.3196`, `0` years within `ε = 0.02`).
   - **15-weight sensitivity grid (`P2` vs. `P1b`):** **NEGATIVE** in `8` points and **INCONCLUSIVE** in `7` points (`0` sustained).
 - **What the App Delivers:** Rather than claiming minimax regret "wins," FieldShift Optimizer provides a transparent, reproducible tool to **compare** rotation strategies side by side, **explore** the Pareto frontier (`36` distinct non-dominated objective vectors; `50` plans including `14` vector ties; `6` distinct crop-signature alternatives), inspect the price of robustness in average climate (`M5 = 0.0080`), and see honestly when robustness did **not** pay off out-of-sample.
-- **Public Repository:** https://github.com/Marcux777/fieldshift-optimizer (created; verify after push)
+- **Public Repository:** https://github.com/Marcux777/fieldshift-optimizer (public, MIT)
 - **Live Deployment URL:** `[RESULT PENDING]`
 
 ---

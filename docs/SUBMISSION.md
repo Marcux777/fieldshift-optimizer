@@ -27,7 +27,7 @@ Format: [RESULT PENDING: 7-slide deck / 30-second video]
 ### Link to Final Project
 ```text
 Live App URL: [RESULT PENDING: public Streamlit Community Cloud URL without login]
-Public Repository URL: https://github.com/Marcux777/fieldshift-optimizer (created; verify public access after push)
+Public Repository URL: https://github.com/Marcux777/fieldshift-optimizer (public, MIT license)
 ```
 
 ### Detailed Description
@@ -98,7 +98,7 @@ Other References:
 
 | Slide | Section | Content |
 |---|---|---|
-| **1** | **Title & Team** | **FieldShift Optimizer** — Explore and Compare Crop Rotation Trade-offs Under Climate Uncertainty<br>Challenge: *Field Shift: Adapting Farms with NASA Data* (`spaceappschallenge.org/2026/challenges/adapting-farms-with-nasa-data/`)<br>Team: `[RESULT PENDING: member names & roles]`<br>Public Repo: `https://github.com/Marcux777/fieldshift-optimizer` (verify after push)<br>Public App: `[RESULT PENDING: live URL]` |
+| **1** | **Title & Team** | **FieldShift Optimizer** — Explore and Compare Crop Rotation Trade-offs Under Climate Uncertainty<br>Challenge: *Field Shift: Adapting Farms with NASA Data* (`spaceappschallenge.org/2026/challenges/adapting-farms-with-nasa-data/`)<br>Team: `[RESULT PENDING: member names & roles]`<br>Public Repo: `https://github.com/Marcux777/fieldshift-optimizer` (public, MIT license)<br>Public App: `[RESULT PENDING: live URL]` |
 | **2** | **The Challenge** | Rainfed 2-year rotation planning in Rio Verde (GO) faces rainfall and dry-spell uncertainty; average-climate plans can struggle in dry years, while worst-case plans can cost performance in typical years. |
 | **3** | **How NASA Data Makes It Possible** | NASA POWER Daily API (`v2.10.3`, `1981–2025`, `16,436` days, `PRECTOTCORR`, `T2M_MAX`, `T2M_MIN`) in a versioned offline snapshot enables 28 construction pairs (`1981/82–2009/10`) and 14 held-out test pairs (`2010/11–2024/25`). |
 | **4** | **Project Image & Architecture** | Screenshots captured directly from the Streamlit app (`docs/assets/`): `app-pareto.png` (Pareto trade-off view) and `app-negative-evaluation.png` (honest negative evaluation view); additional captures: `app-nasa-sources.png`, `app-ad1-p0-infeasible.png`.<br>ZARC `<= 20%` filter (`576` feasible plans) + 3-objective scoring (`g1`, `g2`, `g3`) + `P0 / P1 / P1b / P2` comparison + `36` distinct non-dominated objective vectors (`50` plans with `14` vector ties; `6` distinct alternatives). |

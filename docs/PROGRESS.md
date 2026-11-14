@@ -11,6 +11,6 @@ Estado em 14/11/2026 ~16h (Brasília). Fonte de verdade: commits, `reports/` e a
 | App Streamlit | Feito, local; instalação isolada a partir do `git archive` OK | `tests/test_app.py`, `docs/assets/` |
 | Documentação em inglês | Feita; faltam URLs, equipe, mídia SI, demo | `README.md`, `docs/SUBMISSION.md` |
 | Testes | `170 passed`; `ruff` limpo | contêiner `fieldshift-dev` |
-| Revisão independente | VSDD: APROVADO COM RESSALVAS (sem bloqueante); Critical Reviewer: COM RESSALVAS; correções aplicadas, sem nova rodada | commits `da19828`, `4be59f1` |
-| Repositório público | Criado (vazio até o push do HEAD final); push pelo Software Engineer | https://github.com/Marcux777/fieldshift-optimizer |
+| Revisão independente | VSDD: APROVADO em `bda6939` (re-revisão do delta; só achados menores); Critical Reviewer: COM RESSALVAS, aplicadas | commits `da19828`, `4be59f1`, `5bd8846` |
+| Repositório público | Publicado em `bda6939`; público, licença MIT, clone anônimo e instalação verificados | https://github.com/Marcux777/fieldshift-optimizer |
 | Deploy Cloud, demo, equipe, mídia SI, submissão | PENDENTE: ação do usuário | — |
