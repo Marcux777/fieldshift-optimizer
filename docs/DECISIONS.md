@@ -24,3 +24,15 @@ Prioridade: 1) elegibilidade da fonte e regras agronômicas; 2) dados e motor; 3
 - **Grade de 15 pesos:** todas as combinações de três pesos em múltiplos de 0,25 que somam 1 (incluindo 0,50/0,25/0,25). Dá exatamente 15 pontos.
 - **Três objetivos:** exposição climática, cobertura vegetal e diversidade. A ocupação das janelas de 2ª safra, que a Optimization propôs como quarto objetivo, sai dos pesos; a 2ª safra opcional é tratada como restrição/opção.
 - **Container:** usado em desenvolvimento e testes, para reprodução, conforme o pedido de 13/11 ("use um container"). O deploy não usa Docker (Streamlit Community Cloud instala a partir do repositório, então o repositório precisa trazer a lista de dependências e o snapshot).
+
+## Decisões do Development Lead que fecham lacunas (13/11 noite; o usuário pode revogar)
+
+- **2ª safra opcional.** Leitura literal da decisão 4: a 2ª safra (J2/J4) só pode ficar em pousio quando for inviável (sem decêndio ZARC ≤20% ou sem janela livre de sobreposição). Se for viável, o plano a inclui. As notas de Methods e Optimization dizem "pousio sempre permitido"; esta decisão prevalece. Trocar é uma linha no verificador de restrições. Reportar quantas soluções usam pousio.
+- **Exposição climática.** Média sobre as culturas de grão do plano (não a soma nas 4 janelas), para não premiar o pousio. Vale sobre a nota do Methods; o Methods aplica a revisão em 14/11.
+- **Plano atual (P0).** Parâmetro de entrada, padrão sugerido: soja GI semeada em 11/out e milho 2ª GI em 26/jan [hipótese]. Se violar ZARC ≤20%, vira "inviável sob ZARC" e sai do regret, com relato explícito. Verificar logo no início de 14/11 se o P0 padrão é viável.
+- **Protocolo.** `docs/EVALUATION_PROTOCOL.md` é a v1.1 congelada, SHA-256 `ee8e51c5b2eecc7319818a5645ef15b84d677eabab35caad1a7e9fc41deaefb9`.
+- **Cópia da preparação.** `docs/planning/prep/` guarda as notas de 13/11 e o recorte do ZARC (`SHA256SUMS`). Em conflito, valem `docs/DECISIONS.md` e depois as seções "Revisão 13/11 noite" das notas.
+
+## Verificação adicional em 13/11/2026
+
+- NASA POWER, célula (-18,0 / -50,625): `T2M_MAX` e `T2M_MIN` também com 16 436 dias e 0 valores -999 (1981-01-01 a 2025-12-31).

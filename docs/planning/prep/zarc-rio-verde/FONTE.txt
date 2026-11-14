@@ -1,0 +1,7 @@
+Recorte do município de Rio Verde (GO), geocódigo IBGE 5218805, da Tábua de Risco ZARC (dados abertos MAPA, licença CC-BY).
+Baixado em 2026-11-13 (preparação; sem processamento além do filtro por geocódigo).
+2025/2026: https://dados.agricultura.gov.br/dataset/6d3d141c-885e-41a4-ab7f-dc8ff323b96f/resource/f9d597f9-0fee-47eb-9344-8642274ca9da/download/dados-abertos-tabua-de-risco-safra-2025-2026.csv  sha256 do arquivo nacional: f49e686849b5f29a456101e852360c7c748608b8852cb42408ff4f37267a9581
+2026/2027: https://dados.agricultura.gov.br/dataset/6d3d141c-885e-41a4-ab7f-dc8ff323b96f/resource/139e5a60-1f43-4cc8-aeab-a35dbbf816c0/download/dados-abertos-tabua-de-risco-safra-2026-2027.csv  sha256 do arquivo nacional: b5d242f78571d4694c843f8a5f8fcad4dc10c1c83192ebae2d40b78cc5f5efe3
+Dicionário: https://dados.agricultura.gov.br/dataset/6d3d141c-885e-41a4-ab7f-dc8ff323b96f/resource/bebb0ebb-bc75-460c-b900-a7a1ebd87bee/download/dicionario-de-dados-tabua-de-risco-2026.pdf
+Valores dec1..dec36: 0 = não indicado; 20/30/40 = classe de risco (%). Cod_Ciclo 20/21/22 = Grupo I/II/III. Cod_Solo 1/2/3 = arenoso/textura média/argiloso; 11..16 = AD1..AD6.
+Nota: o servidor recusa o agente padrão do curl; usar --http1.1 e um User-Agent de navegador.
