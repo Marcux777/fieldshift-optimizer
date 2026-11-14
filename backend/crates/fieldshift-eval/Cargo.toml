@@ -1,0 +1,16 @@
+[package]
+name = "fieldshift-eval"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+fieldshift-model = { path = "../fieldshift-model" }
+fieldshift-numeric = { path = "../fieldshift-numeric" }
+serde.workspace = true
+serde_json = { workspace = true, features = ["float_roundtrip"] }
+sha2.workspace = true
+thiserror.workspace = true

@@ -1,0 +1,96 @@
+# AI-assisted (OpenBot agent)
+name: Rust migration
+on:
+  push:
+    branches: [main, feat/rust-svelte-migration]
+  pull_request:
+    paths: ['backend/**', 'frontend/**', 'fixtures/reference/**', 'config/**', 'data/snapshots/**', '.github/workflows/rust-migration.yml']
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: cargo fmt --manifest-path backend/Cargo.toml --all --check
+      - run: cargo clippy --locked --manifest-path backend/Cargo.toml --workspace --all-targets -- -D warnings
+      - run: cargo test --locked --manifest-path backend/Cargo.toml --workspace
+      - run: cargo build --locked --release --manifest-path backend/Cargo.toml --workspace
+  differential:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Fixtures against recomputed Rust science
+        run: cargo test --locked --manifest-path backend/Cargo.toml --workspace --test 'differential_*'
+      - name: Offline CLI from frozen snapshot
+        run: |
+          cargo run --locked --release --manifest-path backend/Cargo.toml -p fieldshift-cli -- run-evaluation --output artifacts/rust/ci
+          cargo run --locked --release --manifest-path backend/Cargo.toml -p fieldshift-cli -- diff-reference artifacts/rust/ci/run_result.json fixtures/reference/golden_run_result.json
+          cargo run --locked --release --manifest-path backend/Cargo.toml -p fieldshift-cli -- diff-reference artifacts/rust/ci/eval_report.json fixtures/reference/golden_eval_report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rust-differential-results
+          path: artifacts/rust/ci
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - run: |
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --no-fund
+          else
+            npm install --no-audit --no-fund
+          fi
+        working-directory: frontend
+      - run: npm run check
+        working-directory: frontend
+      - run: npm run test -- --run
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+      - run: cargo build --locked --release --manifest-path backend/Cargo.toml -p fieldshift-api
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      # Playwright's webServer must launch the real Rust API, never fixtures/contract replay.
+      - run: npm run test:e2e
+        working-directory: frontend
+        env:
+          FIELDSHIFT_ROOT: ${{ github.workspace }}
+          FIELDSHIFT_STATIC_DIR: ${{ github.workspace }}/frontend/build
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-results
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f backend/Dockerfile -t fieldshift:ci .
+      - name: Non-root Rust-only runtime
+        run: |
+          docker run --name fieldshift-ci -d -p 127.0.0.1:3000:3000 fieldshift:ci
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3000/v1/health; then break; fi
+            sleep 2
+          done
+          curl --fail http://127.0.0.1:3000/v1/health
+          curl --fail http://127.0.0.1:3000/
+          docker exec fieldshift-ci sh -c 'test "$(id -u)" != 0 && ! command -v python && ! command -v python3 && test ! -d /app/reports && test ! -d /app/fixtures'
+          docker run --name fieldshift-ci-port -d -e PORT=4100 -p 127.0.0.1:4100:4100 fieldshift:ci
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4100/v1/health; then break; fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:4100/v1/health

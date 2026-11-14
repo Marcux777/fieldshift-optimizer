@@ -1,0 +1,18 @@
+[package]
+name = "fieldshift-io"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+fieldshift-numeric = { path = "../fieldshift-numeric" }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+toml.workspace = true
+csv.workspace = true
+flate2.workspace = true
+thiserror.workspace = true

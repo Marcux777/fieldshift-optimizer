@@ -1,0 +1,17 @@
+// AI-assisted (OpenBot agent)
+import { sveltekit } from '@sveltejs/kit/vite';
+import tailwindcss from '@tailwindcss/vite';
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  plugins: [tailwindcss(), sveltekit()],
+  server: {
+    proxy: {
+      '/v1': 'http://127.0.0.1:3000',
+      '/health': 'http://127.0.0.1:3000'
+    }
+  },
+  test: {
+    include: ['src/**/*.test.ts']
+  }
+});

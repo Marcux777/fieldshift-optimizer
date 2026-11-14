@@ -1,0 +1,18 @@
+# Oráculo Python SOMENTE para gerar fixtures de teste da migração (baseline 16cc391).
+# Contêiner próprio porque monta ESTA worktree; o `fieldshift-dev` monta o checkout de main.
+# Uso: docker compose -f compose.oracle.yaml up -d oracle; docker compose -f compose.oracle.yaml exec -T oracle <cmd>
+name: fieldshift-oracle
+x-shared-cache-uv: &shared-cache-uv ${DOCKER_SHARED_CACHE_ROOT:-${HOME}/.cache/docker-shared}/uv:/home/app/.cache/uv:z
+services:
+  oracle:
+    image: fieldshift:dev
+    container_name: fieldshift-oracle
+    command: sleep infinity
+    working_dir: /app
+    network_mode: none
+    volumes:
+      - .:/app:z
+      - *shared-cache-uv
+    environment:
+      UV_PROJECT_ENVIRONMENT: /opt/venv
+      PYTHONHASHSEED: "0"
