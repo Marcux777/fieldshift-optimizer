@@ -62,6 +62,23 @@ pub fn select_mmr(losses: &[Vec<f64>], plan_ids: &[Vec<i32>]) -> Result<usize, S
          &plan_ids[i])
     }).ok_or(SelectionError::Empty)
 }
+/// P1 = lexicographic (loss under construction-only mean climate, mean loss, stable ID).
+pub fn select_conv(losses: &[Vec<f64>], mean_climate_losses: &[f64],
+    plan_ids: &[Vec<i32>]) -> Result<usize, SelectionError> {
+    regrets(losses)?;
+    if losses.len() != mean_climate_losses.len() || losses.len() != plan_ids.len()
+        || plan_ids.iter().any(|id| id.is_empty()) {
+        return Err(SelectionError::InvalidPlanIds);
+    }
+    if !mean_climate_losses.iter().all(|x| x.is_finite() && *x >= 0.) {
+        return Err(SelectionError::NonFinite);
+    }
+    (0..losses.len()).min_by_key(|&i| (
+        q(mean_climate_losses[i]),
+        q(sum_stable(&losses[i]) / losses[i].len() as f64),
+        &plan_ids[i]
+    )).ok_or(SelectionError::Empty)
+}
 /// P1b = lexicographic (mean loss, max regret, stable plan ID).
 pub fn select_exp(losses: &[Vec<f64>], plan_ids: &[Vec<i32>]) -> Result<usize, SelectionError> {
     let regret = regrets(losses)?;
@@ -100,6 +117,13 @@ mod tests {
         let loss = vec![vec![0.3,0.3],vec![0.3,0.3]];
         assert_eq!(select_mmr(&loss,&[vec![3],vec![1]]), Ok(1));
         assert_eq!(select_exp(&loss,&[vec![3],vec![1]]), Ok(1));
+    }
+    #[test]
+    fn conventional_uses_mean_climate_then_mean_loss() {
+        let losses = vec![vec![0.3,0.7], vec![0.4,0.4]];
+        let ids = vec![vec![1],vec![2]];
+        assert_eq!(select_conv(&losses, &[0.2,0.3], &ids), Ok(0));
+        assert_eq!(select_conv(&losses, &[0.3,0.3], &ids), Ok(1));
     }
     #[test]
     fn rejects_invalid_matrices() {

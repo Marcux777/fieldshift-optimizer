@@ -1,5 +1,6 @@
 // AI-assisted implementation. Frozen evidence is read-only. Scientific recomputation is NOT ported yet.
 mod selection;
+mod pareto;
 
 use std::{env, fs, net::SocketAddr, path::{Path, PathBuf}, sync::Arc};
 use anyhow::{bail, Context, Result};
@@ -122,6 +123,29 @@ mod tests {
         assert_eq!(s.run["protocol_version"], "1.1");
         assert!(s.report["comparisons"].as_array().unwrap().iter().any(|c|
             c["a"] == "P2" && c["b"] == "P1b" && c["classification"] == "NEGATIVO"));
+    }
+    #[test]
+    fn frontier_matches_all_frozen_representatives() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let s = load_state(root).expect("verified run");
+        let objs = s.run["objectives"].as_array().expect("objectives");
+        let mut candidates = Vec::with_capacity(objs.len());
+        for entry in objs {
+            let row = entry.as_array().expect("row");
+            let id = row[0].as_array().expect("plan ID").iter()
+                .map(|x| x.as_i64().unwrap() as i32).collect();
+            let mut scores = [0.0; 4];
+            for (idx, output) in scores.iter_mut().enumerate() {
+                *output = row[idx+1].as_f64().expect("normalized objective");
+            }
+            candidates.push(pareto::Candidate { id, scores });
+        }
+        let actual = pareto::frontier(&candidates).unwrap();
+        let expected: Vec<Vec<i32>> = s.run["pareto"]["front_ids"].as_array().unwrap().iter()
+            .map(|p| p.as_array().unwrap().iter().map(|i| i.as_i64().unwrap() as i32).collect())
+            .collect();
+        assert_eq!(actual, expected);
+        assert_eq!(actual.len(), 36);
     }
     #[test]
     fn refuses_mutated_evidence() {
