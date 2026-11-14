@@ -1,7 +1,20 @@
 <script lang="ts">
   // AI-assisted (OpenBot agent)
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import '../app.css';
+  import ParetoChart from '$lib/components/ParetoChart.svelte';
+  import PlanTimeline from '$lib/components/PlanTimeline.svelte';
+  import {
+    ALTERNATIVE_REASON_LABELS,
+    CLASSIFICATION_RULE,
+    GLOSSARY,
+    checkWeights,
+    comparisonReasonLabel,
+    expandAlternatives,
+    frontKeySet,
+    parseEvalSensitivity,
+    sameWeights
+  } from '$lib/presentation';
   import {
     DEFAULT_INPUTS,
     DEFAULT_P0,
@@ -77,10 +90,15 @@
 
   const defaultP0 = $derived<CurrentPlan>(catalog?.default_p0 ?? DEFAULT_P0);
 
+  // An emptied number input binds to null; treat it as invalid, not as 0.
+  function toNum(v: unknown): number {
+    return v === null || v === undefined || v === '' ? Number.NaN : Number(v);
+  }
+
   const candidateInputs = $derived({
     ad_class: adClass,
     texture,
-    weights: [Number(wExposure), Number(wCoverage), Number(wDiversity)],
+    weights: [toNum(wExposure), toNum(wCoverage), toNum(wDiversity)],
     p0: {
       j1: p0J1,
       dec1: Number(p0Dec1),
@@ -97,9 +115,9 @@
     return (
       adClass !== activeInputs.ad_class ||
       texture !== activeInputs.texture ||
-      Math.abs(Number(wExposure) - activeInputs.weights[0]) > 1e-9 ||
-      Math.abs(Number(wCoverage) - activeInputs.weights[1]) > 1e-9 ||
-      Math.abs(Number(wDiversity) - activeInputs.weights[2]) > 1e-9 ||
+      !(Math.abs(toNum(wExposure) - activeInputs.weights[0]) <= 1e-12) ||
+      !(Math.abs(toNum(wCoverage) - activeInputs.weights[1]) <= 1e-12) ||
+      !(Math.abs(toNum(wDiversity) - activeInputs.weights[2]) <= 1e-12) ||
       p0J1 !== p0Active.j1 ||
       Number(p0Dec1) !== p0Active.dec1 ||
       p0J2 !== p0Active.j2 ||
@@ -108,6 +126,31 @@
       p0J4 !== p0Active.j4
     );
   });
+
+  const weightCheck = $derived(checkWeights(candidateInputs.weights));
+  const weightsInvalid = $derived(weightCheck.kind === 'invalid');
+
+  // Results stay on screen after a rejected or failed submission, marked as stale.
+  const resultsStale = $derived(Boolean(runResult) && (inputsDirty || formError !== ''));
+
+  const activeInputsSummary = $derived(
+    `${activeInputs.ad_class} / ${TEXTURE_LABELS[activeInputs.texture] ?? activeInputs.texture}, weights ${activeInputs.weights.map((w) => w.toFixed(2)).join(' / ')}`
+  );
+
+  let glossaryOpen = $state<boolean>(false);
+
+  async function openGlossary(event: MouseEvent, id: string): Promise<void> {
+    event.preventDefault();
+    glossaryOpen = true;
+    await tick();
+    const el = document.getElementById(`glossary-${id}`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el?.focus({ preventScroll: true });
+  }
+
+  function glossaryTitle(id: string): string {
+    return GLOSSARY.find((g) => g.id === id)?.definition ?? '';
+  }
 
   const exploratory = $derived<boolean>(isExploratoryInputs(activeInputs, defaultP0));
 
@@ -129,18 +172,31 @@
     return allObjectiveRows.filter((row) => frontKeys.has(row.planId.join(',')));
   });
 
-  const objectivesByPlanKey = $derived.by(() => {
-    const map = new Map<string, [number, number, number, number]>();
-    for (const row of allObjectiveRows) {
-      map.set(row.planId.join(','), [
-        row.meanExposure,
-        row.worstExposure,
-        row.coverageLoss,
-        row.diversityLoss
-      ]);
-    }
-    return map;
+  const objectiveRowByPlanKey = $derived(new Map(allObjectiveRows.map((row) => [row.planId.join(','), row])));
+
+  const policyChartPoints = $derived.by(() => {
+    if (!runResult) return [];
+    const front = frontKeySet(runResult);
+    return POLICY_KEYS.flatMap((key) => {
+      const id = runResult?.policies[key]?.plan?.id;
+      const row = id ? objectiveRowByPlanKey.get(id.join(',')) : undefined;
+      return row ? [{ ...row, policy: key, onFront: front.has(row.planId.join(',')) }] : [];
+    });
   });
+
+  const alternativeRows = $derived(runResult ? expandAlternatives(runResult) : []);
+  const groupedPolicyNote = $derived.by(() => {
+    const byGroup = new Map<number, string[]>();
+    for (const r of alternativeRows) {
+      if (r.groupSize > 1) byGroup.set(r.group, [...(byGroup.get(r.group) ?? []), ...r.policies]);
+    }
+    return [...byGroup.values()].map((labels) => labels.join('/'));
+  });
+
+  const evalSensitivityRows = $derived(parseEvalSensitivity(evalReport?.sensitivity));
+  function evalSensitivityFor(weights: readonly number[]) {
+    return evalSensitivityRows.find((r) => sameWeights(r.weights, weights)) ?? null;
+  }
 
   function windowSpec(name: string) {
     return catalog?.windows.find((w) => w.name === name);
@@ -169,17 +225,6 @@
     return `${(value * 100).toFixed(1)}%`;
   }
 
-  function sequenceFromPlanId(planId: readonly number[]): string {
-    if (!catalog) return planId.join(', ');
-    return [0, 2, 3, 5]
-      .map((idx) => {
-        const cropIdx = planId[idx];
-        const cropKey = catalog?.crops[cropIdx]?.key ?? String(cropIdx);
-        return cropDisplayName(cropKey);
-      })
-      .join(' → ');
-  }
-
   async function executeComparison(inputs: Inputs): Promise<void> {
     formError = '';
     submitting = true;
@@ -197,8 +242,7 @@
       runResult = nextRun;
       evalReport = nextReport;
     } catch (err) {
-      runResult = null;
-      evalReport = null;
+      // Keep the previous results visible; the stale banner says they belong to the previous inputs.
       if (err instanceof OpenApiHttpError) {
         formError = err.message;
       } else {
@@ -211,10 +255,13 @@
 
   async function handleFormSubmit(event: SubmitEvent): Promise<void> {
     event.preventDefault();
+    if (weightCheck.kind === 'invalid') {
+      // The inline message next to the weight fields already explains the problem.
+      document.getElementById('weight-exposure')?.focus();
+      return;
+    }
     const check = validateInputs(candidateInputs);
     if (check.kind === 'invalid') {
-      runResult = null;
-      evalReport = null;
       formError = check.message;
       return;
     }
@@ -358,6 +405,28 @@
     </header>
 
     <div class="content-wrap">
+      <section class="intro" aria-labelledby="intro-heading" data-testid="tool-intro">
+        <h1 id="intro-heading" class="intro-title">Which crop rotation holds up best when the weather varies?</h1>
+        <p class="intro-lead">
+          FieldShift Optimizer compares a farm's current two-year crop rotation with three optimized alternatives for rainfed fields in Rio Verde, Goiás, using NASA POWER daily climate history and the ZARC sowing-risk limits.
+          It is a decision-support tool for farmers and their advisers choosing a rotation under climate uncertainty: it shows how each plan would have fared in past climate years and does not predict yield, profit or future weather.
+        </p>
+        <details class="glossary" bind:open={glossaryOpen} data-testid="glossary">
+          <summary>Glossary: P0–P2, regret, minimax regret, M1–M5, LOO Hamming, ZARC, Pareto, held-out</summary>
+          <dl>
+            {#each GLOSSARY as g}
+              <div class="glossary-entry" id={`glossary-${g.id}`} tabindex="-1">
+                <dt>{g.term}</dt>
+                <dd>
+                  {g.definition}
+                  <span class="glossary-source">Source: {g.source}</span>
+                </dd>
+              </div>
+            {/each}
+          </dl>
+        </details>
+      </section>
+
       <div class="banner-stack">
         <div class="info-banner" role="note" data-testid="disclaimer-banner">
           {DISCLAIMER}
@@ -407,6 +476,8 @@
                 min="0"
                 max="1"
                 step="0.05"
+                aria-invalid={weightsInvalid}
+                aria-describedby="weights-status"
                 bind:value={wExposure}
               />
             </div>
@@ -419,6 +490,8 @@
                 min="0"
                 max="1"
                 step="0.05"
+                aria-invalid={weightsInvalid}
+                aria-describedby="weights-status"
                 bind:value={wCoverage}
               />
             </div>
@@ -431,10 +504,25 @@
                 min="0"
                 max="1"
                 step="0.05"
+                aria-invalid={weightsInvalid}
+                aria-describedby="weights-status"
                 bind:value={wDiversity}
               />
             </div>
           </div>
+          <p
+            id="weights-status"
+            class="weights-status"
+            class:invalid={weightsInvalid}
+            aria-live="polite"
+            data-testid="weights-status"
+          >
+            {#if weightCheck.kind === 'invalid'}
+              {weightCheck.message}
+            {:else}
+              Weights add up to 1.
+            {/if}
+          </p>
 
           <div class="form-grid-p0">
             <div class="field-group">
@@ -511,7 +599,9 @@
                 type="submit"
                 class="btn-primary"
                 data-testid="compare-rotations-btn"
-                disabled={submitting}
+                aria-describedby="weights-status"
+                disabled={submitting || weightsInvalid}
+                title={weightsInvalid ? 'Fix the weights first: they must add up to 1.' : undefined}
               >
                 {submitting ? 'Computing in Rust…' : 'Compare rotations'}
               </button>
@@ -520,15 +610,16 @@
         </form>
       </section>
 
-      {#if inputsDirty}
-        <div class="warning-banner mb-4" role="status">
-          Inputs changed. Submit again ("Compare rotations") to update results.
-        </div>
-      {/if}
-
       {#if formError}
         <div class="error-banner mb-4" role="alert" data-testid="form-error">
           {formError}
+        </div>
+      {/if}
+
+      {#if resultsStale}
+        <div class="warning-banner stale-banner mb-4" role="status" data-testid="stale-results-warning">
+          Results below are from the previous inputs ({activeInputsSummary}), not from the values now in the form.
+          {weightsInvalid ? 'Fix the weights, then select "Compare rotations" to update them.' : 'Select "Compare rotations" to update them.'}
         </div>
       {/if}
 
@@ -549,14 +640,14 @@
 
         <div class="flex items-baseline justify-between flex-wrap gap-3 mb-4">
           <div>
-            <h1 class="text-2xl font-extrabold m-0" data-testid="outcome-heading">
+            <h2 class="text-2xl font-extrabold m-0" data-testid="outcome-heading">
               {outcomeHeading}
-            </h1>
+            </h2>
             <p class="help-text m-0 mt-1">
               Primary retrospective comparison: P2 vs P1b. All outcomes use the same format.
             </p>
           </div>
-          <div class="text-xs text-slate-600 font-mono" data-testid="snapshot-config-caption">
+          <div class="text-xs text-slate-600 font-mono min-w-0 max-w-full break-all" data-testid="snapshot-config-caption">
             Snapshot: {runResult.snapshot_id} · Configuration: {runResult.config_hash}
           </div>
         </div>
@@ -623,7 +714,10 @@
                 <div class="panel-header">
                   <div>
                     <span class="overline">Test Performance</span>
-                    <h3 class="text-base font-bold">Worst-case regret by strategy (M1)</h3>
+                    <h3 class="text-base font-bold">
+                      Worst-case regret by strategy
+                      (<a class="term" href="#glossary-m1" title={glossaryTitle('m1')} onclick={(e) => openGlossary(e, 'm1')}>M1</a>)
+                    </h3>
                   </div>
                   <span class="text-xs text-slate-600">Lower is better</span>
                 </div>
@@ -653,7 +747,9 @@
                 <div class="panel-header">
                   <div>
                     <span class="overline">Primary Comparison</span>
-                    <h3 class="text-base font-bold">P2 (Minimax regret) vs P1b (Expected loss)</h3>
+                    <h3 class="text-base font-bold">
+                      P2 (<a class="term" href="#glossary-minimax-regret" title={glossaryTitle('minimax-regret')} onclick={(e) => openGlossary(e, 'minimax-regret')}>Minimax regret</a>) vs P1b (Expected loss)
+                    </h3>
                   </div>
                 </div>
                 <div class="comparison-metrics">
@@ -678,6 +774,12 @@
                   <small>
                     Wins / ties / losses: {primaryComparison?.wins ?? 0} / {primaryComparison?.ties ?? 0} / {primaryComparison?.losses ?? 0} · Classification: {formatOutcomeLabel(primaryComparison?.classification ?? '')}
                   </small>
+                  {#if primaryComparison}
+                    <small data-testid="primary-classification-reason">
+                      {comparisonReasonLabel(primaryComparison.reason)}
+                      <a href="#classification-rule">See the classification rule.</a>
+                    </small>
+                  {/if}
                 </div>
               </section>
             </div>
@@ -700,7 +802,7 @@
                     <tr>
                       <th>Policy</th>
                       <th>Feasible</th>
-                      <th>Plan ID</th>
+                      <th>Plan (crop and sowing per window)</th>
                       <th>Max test regret (M1)</th>
                       <th>Mean test regret (M2)</th>
                       <th>Mean test loss</th>
@@ -712,7 +814,13 @@
                       <tr>
                         <td><strong>{key}: {POLICY_LABELS[key]}</strong></td>
                         <td>{pm?.feasible ? 'Yes' : 'No'}</td>
-                        <td><code>{pm?.plan_id ? `[${pm.plan_id.join(', ')}]` : '—'}</code></td>
+                        <td class="plan-cell">
+                          {#if pm?.plan_id}
+                            <PlanTimeline planId={pm.plan_id} {catalog} compact />
+                          {:else}
+                            —
+                          {/if}
+                        </td>
                         <td>{fmtNum(pm?.M1_max_regret)}</td>
                         <td>{fmtNum(pm?.M2_mean_regret)}</td>
                         <td>{fmtNum(pm?.mean_loss_test)}</td>
@@ -798,88 +906,49 @@
                 <span class="text-xs text-slate-600">Construction data only · Lower is better</span>
               </div>
               <p class="help-text">
-                2D projection of the construction-only four-dimensional Pareto front. Axes show Mean exposure and Coverage loss; color encodes Diversity loss; tooltips include Worst exposure. Dominance uses all four objective values.
+                Two-dimensional view of the four-objective
+                <a class="term" href="#glossary-pareto" title={glossaryTitle('pareto')} onclick={(e) => openGlossary(e, 'pareto')}>Pareto front</a>,
+                computed on construction years only. Dominance uses all four objectives; worst exposure is in each point's tooltip and in the table.
               </p>
 
-              <div class="plot-shell mb-4">
-                <svg
-                  viewBox="0 0 700 420"
-                  role="img"
-                  aria-label="Scatter plot of non-dominated rotation plans with Mean exposure on x-axis and Coverage loss on y-axis"
-                  data-testid="pareto-scatter-svg"
-                >
-                  {#each [0, 0.25, 0.5, 0.75, 1] as tick}
-                    <line
-                      x1={56 + tick * 595}
-                      y1="24"
-                      x2={56 + tick * 595}
-                      y2="366"
-                      stroke="#e2eae4"
-                      stroke-dasharray="3 5"
-                    />
-                    <line
-                      x1="56"
-                      y1={366 - tick * 342}
-                      x2="651"
-                      y2={366 - tick * 342}
-                      stroke="#e2eae4"
-                      stroke-dasharray="3 5"
-                    />
-                    <text x={56 + tick * 595} y="387" text-anchor="middle">{tick.toFixed(2)}</text>
-                    <text x="46" y={370 - tick * 342} text-anchor="end">{tick.toFixed(2)}</text>
-                  {/each}
-                  {#each frontObjectiveRows as row}
-                    <circle
-                      cx={56 + row.meanExposure * 595}
-                      cy={366 - row.coverageLoss * 342}
-                      r="6.5"
-                      fill={`hsl(${145 - row.diversityLoss * 95} 42% 40%)`}
-                      fill-opacity="0.86"
-                      stroke="#ffffff"
-                      stroke-width="1.5"
-                    >
-                      <title>
-                        Plan [{row.planId.join(', ')}] · Mean exposure {fmtNum(row.meanExposure)} · Worst exposure {fmtNum(row.worstExposure)} · Coverage loss {fmtNum(row.coverageLoss)} · Diversity loss {fmtNum(row.diversityLoss)}
-                      </title>
-                    </circle>
-                  {/each}
-                  <text x="352" y="414" text-anchor="middle" class="axis-title">Mean exposure</text>
-                  <text
-                    x="-200"
-                    y="15"
-                    transform="rotate(-90)"
-                    text-anchor="middle"
-                    class="axis-title"
-                  >
-                    Coverage loss
-                  </text>
-                </svg>
+              <div class="mb-4">
+                <ParetoChart front={frontObjectiveRows} policies={policyChartPoints} {catalog} />
+              </div>
+
+              <div class="info-banner mb-3" role="note" data-testid="pareto-grouping-note">
+                <strong>How alternatives are grouped:</strong> the optimizer keeps one alternative per crop sequence (the crop chosen for each window J1–J4) and ignores sowing dates when grouping.
+                {#if groupedPolicyNote.length > 0}
+                  {groupedPolicyNote.join(', ')} share a crop sequence but differ in sowing dates, so each policy's own plan, ID and objective values are listed on its own row (same group number).
+                {/if}
+                "Min. crop difference" counts windows whose crop differs from the nearest other group.
               </div>
 
               <div class="table-scroll">
-                <table class="data-table">
+                <table class="data-table" data-testid="alternatives-table">
                   <thead>
                     <tr>
-                      <th>Plan ID</th>
-                      <th>Policies</th>
-                      <th>Crop sequence J1–J4</th>
+                      <th>Group</th>
+                      <th>Policy / reason</th>
+                      <th>Plan (crop and sowing per window)</th>
                       <th>On front</th>
                       <th>Objectives (mean exp / worst exp / cov / div)</th>
-                      <th>Min crop-window diff</th>
+                      <th>Min. crop difference</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {#each runResult.alternatives as alt}
-                      {@const objs = objectivesByPlanKey.get(alt.plan_id.join(','))}
-                      <tr>
-                        <td><code>[{alt.plan_id.join(', ')}]</code></td>
-                        <td>{alt.labels.join(', ') || 'Alternative'}</td>
-                        <td>{sequenceFromPlanId(alt.plan_id)}</td>
-                        <td>{alt.on_front ? 'Yes' : 'No'}</td>
+                    {#each alternativeRows as row}
+                      <tr class:group-member={row.groupSize > 1}>
+                        <td>{row.group}{row.groupSize > 1 ? ` (${row.groupSize} plans)` : ''}</td>
                         <td>
-                          {objs ? objs.map((v) => fmtNum(v)).join(' / ') : '—'}
+                          <strong>{row.policies.join(', ') || 'Alternative'}</strong>
+                          <span class="cell-note">{ALTERNATIVE_REASON_LABELS[row.reason] ?? row.reason}</span>
                         </td>
-                        <td>{alt.min_hamming_to_others}</td>
+                        <td class="plan-cell"><PlanTimeline planId={row.planId} {catalog} compact /></td>
+                        <td>{row.onFront ? 'Yes' : 'No'}</td>
+                        <td>
+                          {row.objectives ? row.objectives.map((v) => fmtNum(v)).join(' / ') : '—'}
+                        </td>
+                        <td>{row.minHammingToOthers}{row.hammingRelaxed ? ' (relaxed)' : ''}</td>
                       </tr>
                     {/each}
                   </tbody>
@@ -902,12 +971,13 @@
                 </button>
               </div>
 
-              <div class="table-scroll mb-4">
-                <table class="data-table">
+              <div class="table-scroll mb-3">
+                <table class="data-table" data-testid="comparisons-table">
                   <thead>
                     <tr>
                       <th>Comparison</th>
                       <th>Classification</th>
+                      <th>Why (protocol rule applied)</th>
                       <th>Max regret (A vs B)</th>
                       <th>Median Δ regret</th>
                       <th>95% CI (median Δ)</th>
@@ -920,6 +990,7 @@
                       <tr>
                         <td><strong>{c.a} vs {c.b}</strong></td>
                         <td><strong>{formatOutcomeLabel(c.classification)}</strong></td>
+                        <td class="reason-cell">{comparisonReasonLabel(c.reason)}</td>
                         <td>{fmtNum(c.m1_a)} vs {fmtNum(c.m1_b)}</td>
                         <td>{fmtSigned(c.median_D)}</td>
                         <td>
@@ -939,6 +1010,18 @@
                 </table>
               </div>
 
+              <aside class="rule-box mb-4" id="classification-rule" aria-labelledby="classification-rule-heading" data-testid="classification-rule">
+                <h4 id="classification-rule-heading">How each comparison is classified (frozen before any test result)</h4>
+                <p>{CLASSIFICATION_RULE.d}</p>
+                <ul>
+                  <li>{CLASSIFICATION_RULE.supported}</li>
+                  <li>{CLASSIFICATION_RULE.negative}</li>
+                  <li>{CLASSIFICATION_RULE.inconclusive}</li>
+                </ul>
+                <p><strong>Why a lower maximum regret is not enough:</strong> {CLASSIFICATION_RULE.whyNotM1}</p>
+                <p class="rule-source">Source: {CLASSIFICATION_RULE.source}.</p>
+              </aside>
+
               <p class="help-text">
                 Dry test pairs: {evalReport.dry_test_scenarios.length} ({evalReport.dry_test_scenarios.join(', ') || 'none'});
                 construction dry threshold (P25 Oct–Mar): {fmtNum(evalReport.dry_threshold_mm, 1)} mm.
@@ -952,14 +1035,18 @@
                     <tr>
                       <th>Policy</th>
                       <th>Feasible</th>
-                      <th>M1 max regret</th>
+                      <th>
+                        <a class="term" href="#glossary-m0-m5" title={glossaryTitle('m0-m5')} onclick={(e) => openGlossary(e, 'm0-m5')}>M1 max regret</a>
+                      </th>
                       <th>M2 mean regret</th>
                       <th>M2 median regret</th>
                       <th>M3 dry loss</th>
                       <th>M3 dry regret</th>
                       <th>M4a regret ≤ ε</th>
                       <th>M4b IQR loss</th>
-                      <th>M4c LOO Hamming</th>
+                      <th>
+                        <a class="term" href="#glossary-m4c" title={glossaryTitle('m4c')} onclick={(e) => openGlossary(e, 'm4c')}>M4c LOO Hamming</a>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -995,7 +1082,9 @@
                 </div>
               </div>
               <p class="help-text">
-                All 15 fixed weight combinations are reported. Test results must not be used to choose weights. Changed inputs are exploratory, not confirmatory results.
+                For each fixed weight setting, P1, P1b and P2 are re-selected on construction years and classified on the
+                <a class="term" href="#glossary-held-out" title={glossaryTitle('held-out')} onclick={(e) => openGlossary(e, 'held-out')}>held-out</a>
+                test years with the same rule as the main result. This grid is reported only: it never chooses the weights and never replaces the verdict at the default weights 0.50 / 0.25 / 0.25 (protocol v1.1 §3, §5). Test results must not be used to choose weights; changed inputs are exploratory.
               </p>
               <div class="table-scroll">
                 <table class="data-table" data-testid="sensitivity-table">
@@ -1003,19 +1092,29 @@
                     <tr>
                       <th>#</th>
                       <th>Weights (Exposure / Coverage / Diversity)</th>
-                      <th>P1 plan ID</th>
-                      <th>P1b plan ID</th>
-                      <th>P2 plan ID</th>
+                      <th>P2 vs P1b (held-out)</th>
+                      <th>P2 vs P1 (held-out)</th>
+                      <th>M1 test: P1 / P1b / P2</th>
+                      <th>P1 plan</th>
+                      <th>P1b plan</th>
+                      <th>P2 plan</th>
                     </tr>
                   </thead>
                   <tbody>
                     {#each runResult.sensitivity as row, idx}
-                      <tr>
+                      {@const ev = evalSensitivityFor(row.weights)}
+                      <tr class:default-row={ev?.isDefault}>
                         <td>{idx + 1}</td>
-                        <td>{row.weights.map((w) => w.toFixed(2)).join(' / ')}</td>
-                        <td><code>[{row.P1.join(', ')}]</code></td>
-                        <td><code>[{row.P1b.join(', ')}]</code></td>
-                        <td><code>[{row.P2.join(', ')}]</code></td>
+                        <td>
+                          {row.weights.map((w) => w.toFixed(2)).join(' / ')}
+                          {#if ev?.isDefault}<span class="cell-note">default weights</span>{/if}
+                        </td>
+                        <td data-testid="sensitivity-class-p1b"><strong>{ev?.p2VsP1b ? formatOutcomeLabel(ev.p2VsP1b) : '—'}</strong></td>
+                        <td data-testid="sensitivity-class-p1"><strong>{ev?.p2VsP1 ? formatOutcomeLabel(ev.p2VsP1) : '—'}</strong></td>
+                        <td>{ev ? `${fmtNum(ev.m1.P1)} / ${fmtNum(ev.m1.P1b)} / ${fmtNum(ev.m1.P2)}` : '—'}</td>
+                        <td class="plan-cell-inline"><PlanTimeline planId={row.P1} {catalog} inline /></td>
+                        <td class="plan-cell-inline"><PlanTimeline planId={row.P1b} {catalog} inline /></td>
+                        <td class="plan-cell-inline"><PlanTimeline planId={row.P2} {catalog} inline /></td>
                       </tr>
                     {/each}
                   </tbody>

@@ -227,7 +227,8 @@ export function validateInputs(candidate: {
   if (
     candidate.weights.length !== 3 ||
     candidate.weights.some((w) => !Number.isFinite(w) || w < 0) ||
-    Math.abs(candidate.weights[0] + candidate.weights[1] + candidate.weights[2] - 1.0) > 1e-9
+    // Same tolerance as `Inputs::validate` in backend/crates/fieldshift-api/src/engine.rs.
+    Math.abs(candidate.weights[0] + candidate.weights[1] + candidate.weights[2] - 1.0) > 1e-12
   ) {
     return {
       kind: 'invalid',
