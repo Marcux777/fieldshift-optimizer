@@ -28,8 +28,34 @@ struct DefaultCache {
 struct AppState {
     engine: Arc<Engine>,
     slots: Arc<Semaphore>,
+    queue_wait: Duration,
     default_cache: Arc<DefaultCache>,
 }
+
+/// Concurrency limits for heavy computations (`/v1/run`, `/v1/evaluate`, `/v1/plans`, `/v1/pareto`).
+///
+/// Requests wait in a FIFO queue (Tokio semaphore) for one of `slots` workers. A request that cannot
+/// start within `queue_wait` gets `503 BUSY` with `Retry-After`, so a burst on a small instance
+/// (Render Free: 0.1 CPU) fails fast instead of holding the connection until a proxy timeout.
+#[derive(Clone, Copy, Debug)]
+pub struct ApiLimits {
+    pub slots: usize,
+    pub queue_wait: Duration,
+}
+
+impl Default for ApiLimits {
+    fn default() -> Self {
+        Self {
+            slots: 2,
+            queue_wait: Duration::from_secs(QUEUE_WAIT_SECS),
+        }
+    }
+}
+
+/// Maximum time a computation request waits for a free slot before `503 BUSY`.
+pub const QUEUE_WAIT_SECS: u64 = 30;
+/// Seconds advertised in `Retry-After` when the wait for a slot runs out.
+pub const RETRY_AFTER_SECS: u64 = 5;
 
 pub fn resolve_bind_address(bind_address: Option<&str>, port: Option<&str>) -> String {
     if let Some(bind) = bind_address.map(str::trim).filter(|s| !s.is_empty()) {
@@ -44,11 +70,19 @@ pub fn resolve_bind_address(bind_address: Option<&str>, port: Option<&str>) -> S
 struct ApiError(StatusCode, &'static str, String);
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        (
+        let busy = self.1 == "BUSY";
+        let mut resp = (
             self.0,
             Json(json!({"error":{"code":self.1,"message":self.2}})),
         )
-            .into_response()
+            .into_response();
+        if busy {
+            resp.headers_mut().insert(
+                axum::http::header::RETRY_AFTER,
+                HeaderValue::from(RETRY_AFTER_SECS),
+            );
+        }
+        resp
     }
 }
 fn input(value: Result<Json<Inputs>, JsonRejection>) -> Result<Inputs, ApiError> {
@@ -61,34 +95,27 @@ async fn execute_engine(
     s: AppState,
     i: Inputs,
     operation: &'static str,
-    wait_for_slot: bool,
 ) -> Result<Value, ApiError> {
-    let permit = if wait_for_slot {
-        tokio::time::timeout(Duration::from_secs(120), s.slots.clone().acquire_owned())
-            .await
-            .map_err(|_| {
-                ApiError(
-                    StatusCode::GATEWAY_TIMEOUT,
-                    "TIMEOUT",
-                    "Computation exceeded 120s".into(),
-                )
-            })?
-            .map_err(|_| {
-                ApiError(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "INTERNAL",
-                    "Computation semaphore closed".into(),
-                )
-            })?
-    } else {
-        s.slots.clone().try_acquire_owned().map_err(|_| {
+    // Wait (FIFO) for a free slot instead of rejecting at once; give up after `queue_wait`.
+    let permit = tokio::time::timeout(s.queue_wait, s.slots.clone().acquire_owned())
+        .await
+        .map_err(|_| {
             ApiError(
-                StatusCode::TOO_MANY_REQUESTS,
+                StatusCode::SERVICE_UNAVAILABLE,
                 "BUSY",
-                "Two computations are already running; retry later".into(),
+                format!(
+                    "All computation slots stayed busy for {}s; retry after {RETRY_AFTER_SECS}s",
+                    s.queue_wait.as_secs()
+                ),
             )
         })?
-    };
+        .map_err(|_| {
+            ApiError(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "INTERNAL",
+                "Computation semaphore closed".into(),
+            )
+        })?;
     let job = tokio::task::spawn_blocking(move || {
         let _permit = permit;
         match operation {
@@ -131,20 +158,20 @@ async fn calculate(
             "evaluate" => s
                 .default_cache
                 .evaluate
-                .get_or_try_init(|| execute_engine(s.clone(), i, "evaluate", true))
+                .get_or_try_init(|| execute_engine(s.clone(), i, "evaluate"))
                 .await?
                 .clone(),
             "plans" => s
                 .default_cache
                 .plans
-                .get_or_try_init(|| execute_engine(s.clone(), i, "plans", true))
+                .get_or_try_init(|| execute_engine(s.clone(), i, "plans"))
                 .await?
                 .clone(),
             "pareto" => {
                 let v = s
                     .default_cache
                     .run
-                    .get_or_try_init(|| execute_engine(s.clone(), i, "run", true))
+                    .get_or_try_init(|| execute_engine(s.clone(), i, "run"))
                     .await?;
                 json!({
                     "pareto": v["pareto"],
@@ -155,13 +182,13 @@ async fn calculate(
             _ => s
                 .default_cache
                 .run
-                .get_or_try_init(|| execute_engine(s.clone(), i, "run", true))
+                .get_or_try_init(|| execute_engine(s.clone(), i, "run"))
                 .await?
                 .clone(),
         };
         return Ok(Json(val));
     }
-    Ok(Json(execute_engine(s, i, operation, false).await?))
+    Ok(Json(execute_engine(s, i, operation).await?))
 }
 async fn health() -> Json<Value> {
     Json(json!({"status":"ok","language":"Rust","mode":"computed",
@@ -249,9 +276,19 @@ pub fn router_with_engine(
     static_dir: Option<PathBuf>,
     origins: Vec<HeaderValue>,
 ) -> Router {
+    router_with_limits(engine, static_dir, origins, ApiLimits::default())
+}
+
+pub fn router_with_limits(
+    engine: Arc<Engine>,
+    static_dir: Option<PathBuf>,
+    origins: Vec<HeaderValue>,
+    limits: ApiLimits,
+) -> Router {
     let state = AppState {
         engine,
-        slots: Arc::new(Semaphore::new(2)),
+        slots: Arc::new(Semaphore::new(limits.slots.max(1))),
+        queue_wait: limits.queue_wait,
         default_cache: Arc::new(DefaultCache::default()),
     };
     let api = Router::new()

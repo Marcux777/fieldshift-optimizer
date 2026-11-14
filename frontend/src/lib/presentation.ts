@@ -4,6 +4,7 @@ import {
   cropDisplayName,
   dateLabelFromT,
   decStartT,
+  formatOutcomeLabel,
   parseObjectiveRows,
   type Catalog,
   type EvalReport,
@@ -371,3 +372,182 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     source: 'docs/DATA_SOURCES.md; backend/crates/fieldshift-model/src/catalog.rs'
   }
 ];
+
+// ----------------------------------------------------------------------------- Level B helpers
+
+type Comparison = EvalReport['comparisons'][number];
+
+function f4(v: number | null | undefined): string {
+  return v === null || v === undefined || !Number.isFinite(v) ? '—' : v.toFixed(4);
+}
+
+function s4(v: number | null | undefined): string {
+  return v === null || v === undefined || !Number.isFinite(v) ? '—' : `${v >= 0 ? '+' : ''}${v.toFixed(4)}`;
+}
+
+const VERDICT_PHRASES: Readonly<Record<string, string>> = {
+  NEGATIVO: 'did not reduce',
+  SUSTENTADO: 'reduced',
+  INCONCLUSIVO: 'showed no conclusive difference in'
+};
+
+/** English verdict for the primary comparison; replaces the backend's Portuguese `headline` on screen. */
+export function verdictText(c: Comparison | null | undefined): string {
+  if (!c) return '';
+  const label = formatOutcomeLabel(c.classification);
+  const phrase = VERDICT_PHRASES[c.classification];
+  const numbers = `${f4(c.m1_a)} vs ${f4(c.m1_b)}; median D ${s4(c.median_D)}, 95% CI [${s4(c.ci95_median_D?.[0])}, ${s4(c.ci95_median_D?.[1])}]`;
+  if (!phrase) return `${label}: P2 vs ${c.b} — ${numbers}.`;
+  const comparator = c.b === 'P1b' ? 'expected loss (P1b)' : c.b === 'P1' ? 'mean-climate optimization (P1)' : c.b;
+  return `${label}: minimax regret (P2) ${phrase} maximum test regret versus ${comparator} — ${numbers}.`;
+}
+
+const POLICY_STATUS_LABELS: Readonly<Record<string, string>> = {
+  OK: 'Feasible',
+  INVIAVEL_SOB_ZARC: 'Infeasible under ZARC ≤ 20%'
+};
+
+export function policyStatusLabel(status: string): string {
+  if (POLICY_STATUS_LABELS[status]) return POLICY_STATUS_LABELS[status];
+  if (OUTCOME_FALLBACK.has(status)) return formatOutcomeLabel(status);
+  const words = status.toLowerCase().replaceAll('_', ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+const OUTCOME_FALLBACK = new Set(['INVIAVEL', 'DADOS_INSUFICIENTES', 'NEGATIVO', 'SUSTENTADO', 'INCONCLUSIVO']);
+
+// Weight presets ----------------------------------------------------------------
+
+export type WeightPreset = { readonly value: string; readonly weights: readonly number[]; readonly label: string };
+
+export function weightPresets(
+  source: { readonly weight_grid?: readonly (readonly number[])[] } | null | undefined,
+  defaultWeights: readonly number[]
+): WeightPreset[] {
+  return (source?.weight_grid ?? [])
+    .filter((w) => w.length === 3)
+    .map((w, i) => ({
+      value: String(i),
+      weights: [w[0], w[1], w[2]],
+      label: `${w.map((x) => x.toFixed(2)).join(' / ')}${sameWeights(w, defaultWeights) ? ' (default)' : ''}`
+    }));
+}
+
+export function matchPreset(presets: readonly WeightPreset[], weights: readonly number[]): string {
+  return presets.find((p) => sameWeights(p.weights, weights))?.value ?? 'custom';
+}
+
+// P0 option availability -------------------------------------------------------
+
+export type P0Field = 'j1' | 'dec1' | 'j2' | 'j3' | 'dec3' | 'j4';
+type P0 = { readonly j1: string; readonly dec1: number; readonly j2: string; readonly j3: string; readonly dec3: number; readonly j4: string };
+type Rejection = { readonly window?: string; readonly crop?: string; readonly dec?: number; readonly reason?: string; readonly detail?: string };
+
+export type OptionStatus =
+  /** part of at least one feasible plan together with the other current choices */
+  | { readonly state: 'ok' }
+  /** feasible in some plan, but not with the other current choices (left selectable) */
+  | { readonly state: 'conflict'; readonly reason: string }
+  /** never part of a feasible plan in this soil (disabled) */
+  | { readonly state: 'unavailable'; readonly reason: string };
+
+export function rejectionReasonLabel(r: Rejection): string {
+  if (r.reason === 'ZARC_NAO_INDICADO') return 'not indicated by ZARC for this soil';
+  if (r.reason === 'ZARC_RISCO_ACIMA') {
+    const m = /risco (\d+)% > (\d+)%/.exec(r.detail ?? '');
+    return m ? `ZARC risk ${m[1]}% > ${m[2]}%` : 'ZARC risk above 20%';
+  }
+  if (r.reason === 'SEM_DECENDIO_ZARC_APOS_COLHEITA') return 'no ZARC sowing period ≤ 20% after the previous harvest';
+  return 'violates the calendar or ZARC constraints';
+}
+
+/** `rejections` is in the /v1/run JSON (enumeration log) but not in the generated OpenAPI type. */
+export function parseRejections(run: RunResult): Rejection[] {
+  const raw = (run as unknown as Record<string, unknown>).rejections;
+  return Array.isArray(raw) ? raw.filter((r): r is Rejection => typeof r === 'object' && r !== null) : [];
+}
+
+function cropIndex(catalog: Catalog, key: string): number {
+  return catalog.crops.findIndex((c) => c.key === key);
+}
+
+function decOrdinal(dec: number): number {
+  return (((dec - 25) % 36) + 36) % 36;
+}
+
+/** P0 as a plan ID `(c1, d1, c2, c3, d3, c4)` (same layout as backend catalog.rs `plan_id_of`). */
+export function p0PlanId(p0: P0, catalog: Catalog): number[] {
+  return [
+    cropIndex(catalog, p0.j1),
+    decOrdinal(p0.dec1),
+    cropIndex(catalog, p0.j2),
+    cropIndex(catalog, p0.j3),
+    decOrdinal(p0.dec3),
+    cropIndex(catalog, p0.j4)
+  ];
+}
+
+const FIELD_POS: Readonly<Record<P0Field, number>> = { j1: 0, dec1: 1, j2: 2, j3: 3, dec3: 4, j4: 5 };
+const FIELD_WINDOW: Readonly<Record<P0Field, string>> = { j1: 'J1', dec1: 'J1', j2: 'J2', j3: 'J3', dec3: 'J3', j4: 'J4' };
+
+/**
+ * Availability of each P0 select option, computed from the run's own feasible set (every feasible plan
+ * appears in `objectives`) and explained with `rejections`. Valid only for the soil/texture of that run.
+ */
+export function p0Availability(run: RunResult, catalog: Catalog, p0: P0) {
+  const ids = parseObjectiveRows(run.objectives).map((r) => r.planId as readonly number[]);
+  const feasible = new Set(ids.map((id) => id.join(',')));
+  const rejections = parseRejections(run);
+
+  // ZARC rows are per crop/decendio/soil; the enumerator logs main-crop rejections under J1 and
+  // second-crop rejections under J2, so J3/J4 fall back to them.
+  function rejectionFor(window: string, crop: string, dec?: number): Rejection | undefined {
+    const windows = window === 'J3' ? ['J3', 'J1'] : window === 'J4' ? ['J4', 'J2'] : [window];
+    for (const w of windows) {
+      const hit = rejections.find((r) => r.window === w && r.crop === crop && (dec === undefined || r.dec === dec));
+      if (hit) return hit;
+    }
+    return undefined;
+  }
+
+  function status(field: P0Field, value: string | number): OptionStatus {
+    const candidate = { ...p0, [field]: value } as P0;
+    const id = p0PlanId(candidate, catalog);
+    if (feasible.has(id.join(','))) return { state: 'ok' };
+    const pos = FIELD_POS[field];
+    const window = FIELD_WINDOW[field];
+    // decendio options are judged together with the crop chosen for the same window
+    const pairPos = field === 'dec1' ? 0 : field === 'dec3' ? 3 : null;
+    const existsAlone = ids.some((x) => x[pos] === id[pos] && (pairPos === null || x[pairPos] === id[pairPos]));
+    const crop = field === 'dec1' ? candidate.j1 : field === 'dec3' ? candidate.j3 : String(value);
+    const rej = rejectionFor(window, crop, pairPos === null ? undefined : Number(value));
+    if (!existsAlone) {
+      return { state: 'unavailable', reason: rej ? rejectionReasonLabel(rej) : 'not part of any feasible plan in this soil' };
+    }
+    return {
+      state: 'conflict',
+      reason: rej && pairPos === null && rej.reason === 'SEM_DECENDIO_ZARC_APOS_COLHEITA'
+        ? 'no ZARC sowing period ≤ 20% after the previous harvest with the current choices'
+        : 'not feasible together with the other current choices'
+    };
+  }
+
+  const currentId = p0PlanId(p0, catalog);
+  const currentFeasible = feasible.has(currentId.join(','));
+  const currentReasons: string[] = [];
+  if (!currentFeasible) {
+    for (const field of ['j1', 'dec1', 'j2', 'j3', 'dec3', 'j4'] as P0Field[]) {
+      const st = status(field, p0[field]);
+      if (st.state === 'unavailable') currentReasons.push(`${FIELD_WINDOW[field]}: ${st.reason}`);
+    }
+    if (currentReasons.length === 0) {
+      const pairs: Array<['j2' | 'j4', string]> = [['j2', 'J2'], ['j4', 'J4']];
+      for (const [field, w] of pairs) {
+        const rej = rejectionFor(w, p0[field]);
+        if (rej?.reason === 'SEM_DECENDIO_ZARC_APOS_COLHEITA') currentReasons.push(`${w}: ${rejectionReasonLabel(rej)}`);
+      }
+    }
+    if (currentReasons.length === 0) currentReasons.push('the combination violates the calendar or ZARC constraints');
+  }
+  return { status, currentFeasible, currentReasons };
+}

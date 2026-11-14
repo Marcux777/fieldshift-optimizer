@@ -622,3 +622,94 @@ async fn concurrent_default_requests_single_flight_and_bind_address_resolution()
         "plans must run once for default AD4 and once for non-default AD1"
     );
 }
+
+/// Item A1: concurrent NON-default inputs bypass the default-input cache. With two compute slots they
+/// used to get an immediate `429 BUSY`; they must now wait for a slot and all succeed.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn concurrent_non_default_requests_wait_for_a_slot_instead_of_429() {
+    let app = test_app();
+    let bodies = [
+        json!({"ad_class": "AD1", "texture": "argilosa", "weights": [0.5, 0.25, 0.25]}),
+        json!({"ad_class": "AD2", "texture": "argilosa", "weights": [0.5, 0.25, 0.25]}),
+        json!({"ad_class": "AD3", "texture": "media", "weights": [0.5, 0.25, 0.25]}),
+        json!({"ad_class": "AD5", "texture": "argilosa", "weights": [0.5, 0.25, 0.25]}),
+        json!({"ad_class": "AD4", "texture": "argilosa", "weights": [0.75, 0.25, 0.0]}),
+        json!({"ad_class": "AD4", "texture": "argilosa", "weights": [0.25, 0.25, 0.5]}),
+    ];
+    let mut handles = Vec::new();
+    for body in bodies {
+        let app_c = app.clone();
+        handles.push(tokio::spawn(async move {
+            post_json(&app_c, "/v1/run", &body).await
+        }));
+    }
+    let mut statuses = Vec::new();
+    for h in handles {
+        let (st, val) = h.await.expect("task");
+        statuses.push((st, val["error"]["code"].clone()));
+    }
+    assert!(
+        statuses.iter().all(|(st, _)| *st == StatusCode::OK),
+        "all concurrent non-default runs must succeed, got {statuses:?}"
+    );
+}
+
+/// Item A1 policy: the wait for a slot is bounded. When it runs out the API answers `503 BUSY`
+/// with `Retry-After` instead of holding the connection (protects small instances such as Render Free).
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn bounded_queue_wait_returns_503_with_retry_after() {
+    use fieldshift_api::{router_with_limits, ApiLimits, RETRY_AFTER_SECS};
+    use std::{sync::Arc, time::Duration};
+
+    let engine = Arc::new(Engine::load(&repo_root()).expect("engine loads"));
+    let app = router_with_limits(
+        engine,
+        None,
+        Vec::new(),
+        ApiLimits {
+            slots: 1,
+            queue_wait: Duration::from_millis(50),
+        },
+    );
+    let mut handles = Vec::new();
+    for ad in ["AD1", "AD2", "AD3"] {
+        let app_c = app.clone();
+        handles.push(tokio::spawn(async move {
+            let body = json!({"ad_class": ad, "texture": "argilosa", "weights": [0.5, 0.25, 0.25]});
+            let req = Request::builder()
+                .method(Method::POST)
+                .uri("/v1/run")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&body).expect("json")))
+                .expect("request");
+            let resp = app_c.oneshot(req).await.expect("response");
+            let status = resp.status();
+            let retry = resp
+                .headers()
+                .get(header::RETRY_AFTER)
+                .map(|v| v.to_str().expect("ascii").to_string());
+            let bytes = resp.into_body().collect().await.expect("body").to_bytes();
+            let val: Value = serde_json::from_slice(&bytes).expect("json body");
+            (status, retry, val)
+        }));
+    }
+    let mut ok = 0;
+    let mut busy = 0;
+    for h in handles {
+        let (status, retry, val) = h.await.expect("task");
+        match status {
+            StatusCode::OK => ok += 1,
+            StatusCode::SERVICE_UNAVAILABLE => {
+                busy += 1;
+                assert_eq!(val["error"]["code"], "BUSY");
+                assert_eq!(retry, Some(RETRY_AFTER_SECS.to_string()));
+            }
+            other => panic!("unexpected status {other}: {val}"),
+        }
+    }
+    assert!(ok >= 1, "the request holding the slot must finish");
+    assert!(
+        busy >= 1,
+        "requests that cannot start within queue_wait must get 503"
+    );
+}

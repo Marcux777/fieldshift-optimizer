@@ -1,5 +1,25 @@
 // AI-assisted (OpenBot agent)
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+
+/**
+ * Horizontal overflow measured against the real layout width (document clientWidth) and the configured
+ * viewport. On mobile emulation an overflowing page is zoomed out, which makes window.innerWidth grow
+ * with the content; comparing scrollWidth with innerWidth alone therefore never fails there.
+ */
+async function measureOverflow(page: Page) {
+  const viewport = page.viewportSize()?.width ?? 0;
+  const m = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+    innerWidth: window.innerWidth
+  }));
+  return { ...m, viewport, overflow: m.scrollWidth > m.clientWidth || m.innerWidth > viewport };
+}
+
+async function expectNoHorizontalOverflow(page: Page) {
+  const m = await measureOverflow(page);
+  expect(m, JSON.stringify(m)).toMatchObject({ overflow: false });
+}
 
 test.describe('FieldShift Optimizer Rust + Svelte 5 E2E', () => {
   test('renders default frozen evaluation computed live by Rust API across all 6 tabs without horizontal overflow', async ({
@@ -24,10 +44,7 @@ test.describe('FieldShift Optimizer Rust + Svelte 5 E2E', () => {
       '504c28e85e54cbd4e9470e8a423499299dcbed643cb9b2ff8aa461873e134c18'
     );
 
-    const hasOverflowOverview = await page.evaluate(
-      () => document.documentElement.scrollWidth > window.innerWidth
-    );
-    expect(hasOverflowOverview).toBe(false);
+    await expectNoHorizontalOverflow(page);
 
     await page.screenshot({
       path: testInfo.outputPath(`overview-${testInfo.project.name}.png`),
@@ -173,13 +190,7 @@ test.describe('FieldShift Optimizer Rust + Svelte 5 E2E', () => {
     await expect(sens.getByTestId('sensitivity-class-p1b').filter({ hasText: '—' })).toHaveCount(0);
 
     // No horizontal overflow against the configured viewport (also catches mobile zoom-out)
-    const viewportWidth = page.viewportSize()?.width ?? 0;
-    const widths = await page.evaluate(() => ({
-      scroll: document.documentElement.scrollWidth,
-      inner: window.innerWidth
-    }));
-    expect(widths.inner).toBe(viewportWidth);
-    expect(widths.scroll).toBeLessThanOrEqual(viewportWidth);
+    await expectNoHorizontalOverflow(page);
 
     await page.screenshot({
       path: testInfo.outputPath(`level1-${testInfo.project.name}.png`),
@@ -202,12 +213,211 @@ test.describe('FieldShift Optimizer Rust + Svelte 5 E2E', () => {
       'Exploratory outcome: SUPPORTED'
     );
     await expect(page.getByTestId('kpi-n-plans')).toHaveText('169');
-    await expect(page.getByTestId('p0-infeasible-warning-P0')).toContainText('INVIAVEL_SOB_ZARC');
+    await expect(page.getByTestId('p0-infeasible-warning-P0')).toContainText('Infeasible under ZARC ≤ 20%');
+    await expect(page.getByTestId('policy-card-P0')).toContainText('Infeasible under ZARC ≤ 20%');
+    await expect(page.locator('body')).not.toContainText('INVIAVEL_SOB_ZARC');
     await expect(page.getByTestId('p0-diagnostic-line').first()).toContainText('30% exceeds 20%');
 
     const nav = page.getByRole('navigation', { name: 'Primary navigation' });
     await nav.getByRole('button', { name: 'Policy comparison' }).click();
-    await expect(page.getByTestId('policy-comparison-section')).toContainText('INVIAVEL_SOB_ZARC');
+    await expect(page.getByTestId('policy-comparison-section')).toContainText('Infeasible under ZARC ≤ 20%');
     await expect(page.getByTestId('policy-comparison-section')).toContainText('P2: Minimax regret');
+  });
+
+  test('overflow check fails when content is wider than the screen (negative control)', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('outcome-heading')).toContainText('Outcome: NEGATIVE');
+    expect((await measureOverflow(page)).overflow).toBe(false);
+    await page.addStyleTag({ content: '.content-wrap::after { content: ""; display: block; width: 2000px; height: 1px; }' });
+    await expect.poll(async () => (await measureOverflow(page)).overflow).toBe(true);
+  });
+
+  test('all six navigation items are visible and the GitHub link is reachable on every screen', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('outcome-heading')).toContainText('Outcome: NEGATIVE');
+    const viewport = page.viewportSize()?.width ?? 0;
+    const buttons = page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('button');
+    await expect(buttons).toHaveCount(6);
+    for (let i = 0; i < 6; i++) {
+      await expect(buttons.nth(i)).toBeVisible();
+      const box = await buttons.nth(i).boundingBox();
+      expect(box, `tab ${i}`).not.toBeNull();
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(viewport);
+    }
+    const github = page.locator('a[href="https://github.com/Marcux777/fieldshift-optimizer"]').filter({ visible: true });
+    await expect(github.first()).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test('clicking a navigation item scrolls its section into view and marks it as current', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    await expect(page.getByTestId('outcome-heading')).toContainText('Outcome: NEGATIVE');
+    const nav = page.getByRole('navigation', { name: 'Primary navigation' });
+    await expect(nav.getByRole('button', { name: 'Overview' })).toHaveAttribute('aria-current', 'page');
+
+    const cases: Array<[string, string]> = [
+      ['Weight sensitivity', 'weight-sensitivity-section'],
+      ['Pareto and alternatives', 'pareto-section'],
+      ['Sources and limitations', 'sources-section'],
+      ['Retrospective evaluation', 'retrospective-evaluation-section'],
+      ['Policy comparison', 'policy-comparison-section']
+    ];
+    for (const [tab, testId] of cases) {
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await nav.getByRole('button', { name: tab }).click();
+      await expect(page.getByTestId(testId)).toBeInViewport();
+      await expect(page.getByTestId(testId)).toBeFocused();
+      await expect(nav.getByRole('button', { name: tab })).toHaveAttribute('aria-current', 'page');
+      await expect(nav.locator('[aria-current="page"]')).toHaveCount(1);
+      await expect(page).toHaveTitle(new RegExp(`^${tab} \\| FieldShift Optimizer`));
+    }
+    await nav.getByRole('button', { name: 'Overview' }).click();
+    await expect(page.getByTestId('outcome-heading')).toBeInViewport();
+  });
+
+  test('sidebar stays in view while scrolling on desktop', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'mobile keeps the stacked layout');
+    await page.goto('/');
+    await expect(page.getByTestId('outcome-heading')).toContainText('Outcome: NEGATIVE');
+    await page.evaluate(() => window.scrollTo(0, 4000));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(3000);
+    const sidebar = page.locator('aside.sidebar');
+    await expect(sidebar).toHaveCSS('position', 'sticky');
+    const box = await sidebar.boundingBox();
+    expect(box!.y).toBe(0);
+    await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('button', { name: 'Weight sensitivity' })).toBeInViewport();
+  });
+
+  test('after Compare rotations the result heading is scrolled into view, focused and announced', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    await expect(page.getByTestId('outcome-heading')).toContainText('Outcome: NEGATIVE');
+    await page.locator('#weight-exposure').fill('0.75');
+    await page.locator('#weight-diversity').fill('0');
+    await page.getByTestId('compare-rotations-btn').scrollIntoViewIfNeeded();
+    // The form sits below the verdict, so the heading starts out of view above the button.
+    const before = await page.getByTestId('outcome-heading').boundingBox();
+    expect(before!.y < 0 || before!.y > 150).toBe(true);
+    await page.getByTestId('compare-rotations-btn').click();
+    await expect(page.getByTestId('outcome-heading')).toContainText('Exploratory outcome');
+    await expect(page.getByTestId('outcome-heading')).toBeInViewport();
+    await expect.poll(async () => (await page.getByTestId('outcome-heading').boundingBox())!.y).toBeLessThanOrEqual(100);
+    await expect(page.getByTestId('outcome-heading')).toBeFocused();
+    await expect(page.getByTestId('results-live-region')).toContainText('Results updated');
+  });
+
+  test('a busy API answer (429) is retried and the new result replaces the old one', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('outcome-heading')).toContainText('Outcome: NEGATIVE');
+    let evaluateCalls = 0;
+    await page.route('**/v1/evaluate', async (route) => {
+      evaluateCalls += 1;
+      if (evaluateCalls === 1) {
+        await route.fulfill({
+          status: 429,
+          headers: { 'Retry-After': '0', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: { code: 'BUSY', message: 'busy' } })
+        });
+      } else {
+        await route.continue();
+      }
+    });
+    await page.locator('#soil-ad-select').selectOption('AD1');
+    await page.getByTestId('compare-rotations-btn').click();
+    await expect(page.getByTestId('outcome-heading')).toContainText('Exploratory outcome: SUPPORTED');
+    await expect(page.getByTestId('kpi-n-plans')).toHaveText('169');
+    await expect(page.getByTestId('form-error')).toHaveCount(0);
+    expect(evaluateCalls).toBe(2);
+  });
+
+  test('when the API stays busy the previous result stays visible with an error and a stale warning', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('outcome-heading')).toContainText('Outcome: NEGATIVE');
+    let runCalls = 0;
+    await page.route('**/v1/run', async (route) => {
+      runCalls += 1;
+      await route.fulfill({
+        status: 503,
+        headers: { 'Retry-After': '0', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: { code: 'BUSY', message: 'All computation slots stayed busy' } })
+      });
+    });
+    await page.locator('#soil-ad-select').selectOption('AD1');
+    await page.getByTestId('compare-rotations-btn').click();
+    await expect(page.getByTestId('form-error')).toContainText('busy');
+    await expect(page.getByTestId('outcome-heading')).toContainText('Outcome: NEGATIVE');
+    await expect(page.getByTestId('kpi-n-plans')).toHaveText('576');
+    await expect(page.getByTestId('stale-results-warning')).toContainText('previous inputs');
+    expect(runCalls).toBe(4);
+  });
+
+  test('block B: English verdict, one top notice, form after the verdict, no raw codes', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('outcome-heading')).toContainText('Outcome: NEGATIVE');
+
+    const verdict = page.getByTestId('verdict-text');
+    await expect(verdict).toHaveText(
+      'NEGATIVE: minimax regret (P2) did not reduce maximum test regret versus expected loss (P1b) — 0.1744 vs 0.1466; median D +0.0064, 95% CI [-0.0609, +0.0375].'
+    );
+    const visibleText = await page.locator('body').innerText();
+    for (const raw of ['NEGATIVO', 'perda esperada', 'INVIAVEL', 'OK\n']) {
+      expect(visibleText, raw).not.toContain(raw);
+    }
+    await expect(page.getByTestId('policy-card-P2')).toContainText('Feasible');
+
+    // One short notice at the top; the full text lives in Sources and limitations.
+    await expect(page.locator('.banner-stack > *')).toHaveCount(1);
+    await expect(page.getByTestId('disclaimer-banner')).toContainText('does not replace');
+    await expect(page.getByTestId('sources-section').getByTestId('full-disclaimer')).toContainText('does not replace');
+    await expect(page.getByTestId('sources-section').getByTestId('frozen-outcome-banner')).toContainText('Frozen evaluation outcome: NEGATIVE');
+    await expect(page.locator('footer')).not.toContainText('No claims');
+
+    // Intro, then verdict, then the form.
+    const order = await page.evaluate(() => {
+      const y = (sel: string) => document.querySelector(sel)!.getBoundingClientRect().top + window.scrollY;
+      return { intro: y('[data-testid="tool-intro"]'), verdict: y('[data-testid="verdict-text"]'), form: y('[data-testid="inputs-form"]') };
+    });
+    expect(order.intro).toBeLessThan(order.verdict);
+    expect(order.verdict).toBeLessThan(order.form);
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test('block B: weight presets come from the 15-point grid and fill the three fields', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('outcome-heading')).toContainText('Outcome: NEGATIVE');
+    const preset = page.getByTestId('weight-preset');
+    await expect(preset.locator('option')).toHaveCount(16);
+    await expect(preset).toHaveValue('4');
+    await expect(preset.locator('option:checked')).toHaveText('0.50 / 0.25 / 0.25 (default)');
+    await preset.selectOption({ label: '0.75 / 0.25 / 0.00' });
+    await expect(page.locator('#weight-exposure')).toHaveValue('0.75');
+    await expect(page.locator('#weight-coverage')).toHaveValue('0.25');
+    await expect(page.locator('#weight-diversity')).toHaveValue('0');
+    await expect(page.getByTestId('weights-status')).toHaveText('Weights add up to 1.');
+    await page.locator('#weight-exposure').fill('0.4');
+    await expect(preset).toHaveValue('custom');
+  });
+
+  test('block B: infeasible P0 options are disabled with their ZARC reason before submitting', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('outcome-heading')).toContainText('Outcome: NEGATIVE');
+    const dec1 = page.locator('#p0-dec1');
+    await expect(dec1.locator('option[value="27"]')).toBeDisabled();
+    await expect(dec1.locator('option[value="27"]')).toContainText('unavailable: ZARC risk 40% > 20%');
+    await expect(dec1.locator('option[value="25"]')).toContainText('not indicated by ZARC');
+    await expect(dec1.locator('option[value="29"]')).toBeEnabled();
+    await expect(page.getByTestId('p0-availability-note')).toContainText('AD4');
+
+    // Switching J1 to first-season maize with sowing period 29 is flagged before submission.
+    await page.locator('#p0-j1').selectOption('milho_1a');
+    await expect(page.getByTestId('p0-feasibility-note')).toContainText('not feasible under ZARC ≤ 20%');
+    await expect(page.getByTestId('p0-feasibility-note')).toContainText('J1: ZARC risk 30% > 20%');
+    await expect(dec1.locator('option[value="29"]')).toBeDisabled();
+    // Dec 31 exists for maize but not followed by second-season maize; dec 30 fits the rest of the plan.
+    await expect(dec1.locator('option[value="31"]')).toContainText('not with the other choices');
+    await dec1.selectOption('30');
+    await expect(page.getByTestId('p0-feasibility-note')).toHaveCount(0);
   });
 });

@@ -395,6 +395,24 @@
               }
             }
           },
+          "503": {
+            "description": "All computation slots stayed busy for 30 s (requests queue first); retry after the Retry-After seconds",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "504": {
             "description": "Typed error; no frozen replay or synthetic fallback",
             "content": {
@@ -503,6 +521,24 @@
               }
             }
           },
+          "503": {
+            "description": "All computation slots stayed busy for 30 s (requests queue first); retry after the Retry-After seconds",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "504": {
             "description": "Typed error; no frozen replay or synthetic fallback",
             "content": {
@@ -603,6 +639,24 @@
           },
           "501": {
             "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "All computation slots stayed busy for 30 s (requests queue first); retry after the Retry-After seconds",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -942,6 +996,24 @@
           },
           "501": {
             "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "All computation slots stayed busy for 30 s (requests queue first); retry after the Retry-After seconds",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {

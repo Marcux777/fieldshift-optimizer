@@ -41,6 +41,40 @@ button {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  /* Desktop: navigation stays in view while the results scroll. */
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+/* Targets of navigation and of "Compare rotations"; keep a little space above them. */
+.scroll-target {
+  scroll-margin-top: 16px;
+}
+
+.scroll-target:focus {
+  outline: none;
+}
+
+.topbar-source-link {
+  display: none;
+  font-size: 11px;
+  font-weight: 700;
+  color: #2c5736;
+  text-decoration: underline;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .brand {
@@ -299,7 +333,7 @@ button {
 
 .form-grid-top {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -678,14 +712,20 @@ button {
   overflow-wrap: anywhere;
 }
 
-.limitations {
+.limitations,
+.scope-list {
   line-height: 1.75;
   color: #465d4e;
   font-size: 12px;
   padding-left: 20px;
 }
 
-.limitations li {
+.scope-list {
+  list-style: disc;
+}
+
+.limitations li,
+.scope-list li {
   margin-bottom: 6px;
 }
 
@@ -1074,6 +1114,12 @@ a.term {
   }
   .sidebar {
     padding: 12px 14px;
+    position: static;
+    height: auto;
+    overflow-y: visible;
+  }
+  .topbar-source-link {
+    display: inline;
   }
   .brand {
     margin: 0 0 10px;
@@ -1085,7 +1131,7 @@ a.term {
   }
   .navigation {
     display: flex;
-    overflow-x: auto;
+    flex-wrap: wrap;
     gap: 4px;
     padding-bottom: 2px;
   }
@@ -1094,6 +1140,7 @@ a.term {
     padding: 8px 10px;
     font-size: 11px;
     flex: none;
+    width: auto;
   }
   .nav-mark {
     display: none;

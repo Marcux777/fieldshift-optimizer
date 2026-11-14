@@ -478,16 +478,50 @@ function assertLimitations(data: unknown): Limitations {
   return { items: data.items };
 }
 
-export function createOpenApiClient(options: OpenApiClientOptions = {}): GeneratedOpenApiClient {
+/** Retry policy for busy API answers (`429`, or `503 BUSY` after the server-side queue wait). */
+export type RetryPolicy = {
+  readonly maxRetries: number;
+  readonly baseDelayMs: number;
+  readonly maxDelayMs: number;
+  readonly sleep?: (ms: number) => Promise<void>;
+};
+
+export const DEFAULT_RETRY_POLICY: RetryPolicy = { maxRetries: 3, baseDelayMs: 500, maxDelayMs: 5000 };
+
+const RETRYABLE_STATUSES: ReadonlySet<number> = new Set([429, 503]);
+
+/** Delay before retry number `attempt` (0-based): Retry-After when sent, else exponential backoff; capped. */
+export function retryDelayMs(policy: RetryPolicy, attempt: number, retryAfter: string | null): number {
+  const seconds = retryAfter === null ? Number.NaN : Number(retryAfter);
+  const wanted = Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : policy.baseDelayMs * 2 ** attempt;
+  return Math.min(policy.maxDelayMs, wanted);
+}
+
+export function createOpenApiClient(
+  options: OpenApiClientOptions & { readonly retry?: RetryPolicy } = {}
+): GeneratedOpenApiClient {
   const base = (options.baseUrl ?? '').replace(/\/$/, '');
   const fetchImpl = options.fetchFn ?? fetch;
+  const retry = options.retry ?? DEFAULT_RETRY_POLICY;
+  const sleep = retry.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+
+  async function fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
+    for (let attempt = 0; ; attempt++) {
+      const response = await fetchImpl(url, init);
+      if (!RETRYABLE_STATUSES.has(response.status) || attempt >= retry.maxRetries) {
+        return response;
+      }
+      await response.body?.cancel();
+      await sleep(retryDelayMs(retry, attempt, response.headers.get('Retry-After')));
+    }
+  }
 
   async function requestJson<T>(
     path: string,
     init: RequestInit,
     parse: (raw: unknown) => T
   ): Promise<T> {
-    const response = await fetchImpl(`${base}${path}`, init);
+    const response = await fetchWithRetry(`${base}${path}`, init);
     const text = await response.text();
     let parsed: unknown = null;
     if (text.length > 0) {

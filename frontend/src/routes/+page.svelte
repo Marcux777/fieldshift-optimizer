@@ -12,8 +12,15 @@
     comparisonReasonLabel,
     expandAlternatives,
     frontKeySet,
+    matchPreset,
+    p0Availability,
     parseEvalSensitivity,
-    sameWeights
+    policyStatusLabel,
+    sameWeights,
+    verdictText,
+    weightPresets,
+    type OptionStatus,
+    type P0Field
   } from '$lib/presentation';
   import {
     DEFAULT_INPUTS,
@@ -56,6 +63,34 @@
   type TabName = (typeof TABS)[number];
 
   const POLICY_KEYS = ['P0', 'P1', 'P1b', 'P2'] as const;
+
+  // Element each navigation item scrolls to (ids are set on the result sections below).
+  const TAB_TARGETS: Readonly<Record<TabName, string>> = {
+    Overview: 'results-heading',
+    'Policy comparison': 'section-policy-comparison',
+    'Pareto and alternatives': 'section-pareto',
+    'Retrospective evaluation': 'section-retrospective',
+    'Weight sensitivity': 'section-weight-sensitivity',
+    'Sources and limitations': 'section-sources'
+  };
+
+  function prefersReducedMotion(): boolean {
+    return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+  }
+
+  /** Scroll an element to the top of the viewport and move focus there (for keyboard and screen-reader users). */
+  function reveal(id: string): void {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' });
+    el.focus({ preventScroll: true });
+  }
+
+  async function selectTab(item: TabName): Promise<void> {
+    activeTab = item;
+    await tick();
+    reveal(TAB_TARGETS[item]);
+  }
 
   const rawApiBase = (import.meta.env.VITE_API_BASE_URL ?? '').trim();
   const client = createOpenApiClient({ baseUrl: rawApiBase });
@@ -128,6 +163,41 @@
   });
 
   const weightCheck = $derived(checkWeights(candidateInputs.weights));
+
+  // Weight presets: the 15 fixed settings of the protocol grid (GET /v1/catalog `weight_grid`).
+  const presets = $derived(weightPresets(catalog, [0.5, 0.25, 0.25]));
+  const presetValue = $derived(matchPreset(presets, candidateInputs.weights));
+  function applyPreset(value: string): void {
+    const preset = presets.find((p) => p.value === value);
+    if (!preset) return;
+    wExposure = preset.weights[0];
+    wCoverage = preset.weights[1];
+    wDiversity = preset.weights[2];
+  }
+
+  // P0 option availability from the last run's feasible plans and rejection log; only valid while
+  // the form still has that run's soil and texture.
+  const availability = $derived.by(() => {
+    if (!runResult || !catalog || runResult.status !== 'OK') return null;
+    if (adClass !== activeInputs.ad_class || texture !== activeInputs.texture) return null;
+    return p0Availability(runResult, catalog, {
+      j1: p0J1,
+      dec1: Number(p0Dec1),
+      j2: p0J2,
+      j3: p0J3,
+      dec3: Number(p0Dec3),
+      j4: p0J4
+    });
+  });
+  function optionStatus(field: P0Field, value: string | number): OptionStatus {
+    return availability?.status(field, value) ?? { state: 'ok' };
+  }
+  function optionLabel(base: string, st: OptionStatus, selected = false): string {
+    if (st.state === 'unavailable') return `${base} — unavailable: ${st.reason}`;
+    // The selected value of an infeasible plan is explained by the warning under the selects.
+    if (st.state === 'conflict' && !selected) return `${base} — not with the other choices`;
+    return base;
+  }
   const weightsInvalid = $derived(weightCheck.kind === 'invalid');
 
   // Results stay on screen after a rejected or failed submission, marked as stale.
@@ -225,9 +295,12 @@
     return `${(value * 100).toFixed(1)}%`;
   }
 
-  async function executeComparison(inputs: Inputs): Promise<void> {
+  let liveMessage = $state<string>('');
+
+  async function executeComparison(inputs: Inputs): Promise<boolean> {
     formError = '';
     submitting = true;
+    liveMessage = 'Comparing rotations…';
     try {
       const [nextRun, nextReport] = await Promise.all([
         client.run(inputs),
@@ -241,6 +314,8 @@
       };
       runResult = nextRun;
       evalReport = nextReport;
+      liveMessage = `Results updated: ${formatOutcomeLabel(nextReport.outcome)} for ${inputs.ad_class}, weights ${inputs.weights.map((w) => w.toFixed(2)).join(' / ')}.`;
+      return true;
     } catch (err) {
       // Keep the previous results visible; the stale banner says they belong to the previous inputs.
       if (err instanceof OpenApiHttpError) {
@@ -248,9 +323,19 @@
       } else {
         formError = err instanceof Error ? err.message : String(err);
       }
+      liveMessage = '';
+      return false;
     } finally {
       submitting = false;
     }
+  }
+
+  /** After a user-started comparison, bring the result heading into view. */
+  async function showResults(ok: boolean): Promise<void> {
+    if (!ok) return;
+    activeTab = 'Overview';
+    await tick();
+    reveal('results-heading');
   }
 
   async function handleFormSubmit(event: SubmitEvent): Promise<void> {
@@ -265,7 +350,7 @@
       formError = check.message;
       return;
     }
-    await executeComparison(check.inputs);
+    await showResults(await executeComparison(check.inputs));
   }
 
   async function handleResetDefaults(): Promise<void> {
@@ -281,12 +366,14 @@
     p0J3 = def.j3;
     p0Dec3 = def.dec3;
     p0J4 = def.j4;
-    await executeComparison({
-      ad_class: 'AD4',
-      texture: 'argilosa',
-      weights: [0.5, 0.25, 0.25],
-      p0: { ...def }
-    });
+    await showResults(
+      await executeComparison({
+        ad_class: 'AD4',
+        texture: 'argilosa',
+        weights: [0.5, 0.25, 0.25],
+        p0: { ...def }
+      })
+    );
   }
 
   function downloadEvaluationJson(): void {
@@ -337,105 +424,14 @@
 </script>
 
 <svelte:head>
-  <title>FieldShift Optimizer | Climate-aware crop rotation decision support</title>
+  <title>{activeTab} | FieldShift Optimizer: climate-aware crop rotation decision support</title>
   <meta
     name="description"
     content="Support rainfed crop rotation decisions in Rio Verde, Goiás with verified NASA POWER data, ZARC constraints and transparent retrospective evaluation."
   />
 </svelte:head>
 
-<div class="app-shell">
-  <aside class="sidebar">
-    <div class="brand">
-      <span class="brand-icon">F<span class="brand-dot">.</span></span>
-      <span class="brand-word">FieldShift<small>OPTIMIZER</small></span>
-    </div>
-    <div class="section-label">Workspace</div>
-    <nav class="navigation" aria-label="Primary navigation">
-      {#each TABS as item}
-        <button
-          type="button"
-          class:active={activeTab === item}
-          onclick={() => (activeTab = item)}
-        >
-          <span class="nav-mark">
-            {item === 'Overview'
-              ? '◈'
-              : item === 'Policy comparison'
-                ? '≋'
-                : item === 'Pareto and alternatives'
-                  ? '◇'
-                  : item === 'Retrospective evaluation'
-                    ? '▣'
-                    : item === 'Weight sensitivity'
-                      ? '⊞'
-                      : '▤'}
-          </span>
-          {item}
-        </button>
-      {/each}
-    </nav>
-    <div class="sidebar-bottom">
-      <div class="sidebar-tag"><span class="status-dot"></span> Verified NASA snapshot</div>
-      <p>Rio Verde · Goiás · Brazil</p>
-      <p>Rainfed · 2 agricultural years · 4 windows</p>
-      <p>NASA POWER / ZARC 2026–27</p>
-      <a
-        href="https://github.com/Marcux777/fieldshift-optimizer"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        View source on GitHub ↗
-      </a>
-    </div>
-  </aside>
-
-  <main class="main-content">
-    <header class="topbar">
-      <div class="breadcrumb">
-        FieldShift Optimizer <span>/</span> <strong>{activeTab}</strong>
-      </div>
-      <div class="topbar-right">
-        {#if exploratory}
-          <span class="mode-pill exploratory" data-testid="mode-pill">EXPLORATORY RUN</span>
-        {:else}
-          <span class="mode-pill" data-testid="mode-pill">COMPUTED IN RUST · PROTOCOL v1.1</span>
-        {/if}
-      </div>
-    </header>
-
-    <div class="content-wrap">
-      <section class="intro" aria-labelledby="intro-heading" data-testid="tool-intro">
-        <h1 id="intro-heading" class="intro-title">Which crop rotation holds up best when the weather varies?</h1>
-        <p class="intro-lead">
-          FieldShift Optimizer compares a farm's current two-year crop rotation with three optimized alternatives for rainfed fields in Rio Verde, Goiás, using NASA POWER daily climate history and the ZARC sowing-risk limits.
-          It is a decision-support tool for farmers and their advisers choosing a rotation under climate uncertainty: it shows how each plan would have fared in past climate years and does not predict yield, profit or future weather.
-        </p>
-        <details class="glossary" bind:open={glossaryOpen} data-testid="glossary">
-          <summary>Glossary: P0–P2, regret, minimax regret, M1–M5, LOO Hamming, ZARC, Pareto, held-out</summary>
-          <dl>
-            {#each GLOSSARY as g}
-              <div class="glossary-entry" id={`glossary-${g.id}`} tabindex="-1">
-                <dt>{g.term}</dt>
-                <dd>
-                  {g.definition}
-                  <span class="glossary-source">Source: {g.source}</span>
-                </dd>
-              </div>
-            {/each}
-          </dl>
-        </details>
-      </section>
-
-      <div class="banner-stack">
-        <div class="info-banner" role="note" data-testid="disclaimer-banner">
-          {DISCLAIMER}
-        </div>
-        <div class="info-banner" role="note" data-testid="frozen-outcome-banner">
-          {FROZEN_OUTCOME_BANNER}
-        </div>
-      </div>
-
+{#snippet inputsPanel()}
       <!-- Farm and priorities interactive form -->
       <section class="panel" aria-labelledby="inputs-heading">
         <div class="panel-header">
@@ -465,6 +461,21 @@
                 {#each (catalog?.textures ?? ['argilosa', 'media', 'arenosa']) as tex}
                   <option value={tex}>{TEXTURE_LABELS[tex as Inputs['texture']] ?? tex}</option>
                 {/each}
+              </select>
+            </div>
+
+            <div class="field-group">
+              <label for="weight-preset">Weight preset</label>
+              <select
+                id="weight-preset"
+                value={presetValue}
+                onchange={(e) => applyPreset(e.currentTarget.value)}
+                data-testid="weight-preset"
+              >
+                {#each presets as preset}
+                  <option value={preset.value}>{preset.label}</option>
+                {/each}
+                <option value="custom">Custom (edit the three fields)</option>
               </select>
             </div>
 
@@ -529,7 +540,8 @@
               <label for="p0-j1">Year 1: main crop (J1)</label>
               <select id="p0-j1" bind:value={p0J1}>
                 {#each j1Crops as c}
-                  <option value={c}>{cropDisplayName(c)}</option>
+                  {@const st = optionStatus('j1', c)}
+                  <option value={c} disabled={st.state === 'unavailable'} title={st.state === 'ok' ? undefined : st.reason}>{optionLabel(cropDisplayName(c), st, c === p0J1)}</option>
                 {/each}
               </select>
             </div>
@@ -538,7 +550,8 @@
               <label for="p0-dec1">Year 1: sowing period</label>
               <select id="p0-dec1" bind:value={p0Dec1}>
                 {#each j1Decs as d}
-                  <option value={d}>{decendioOptionLabel(d)}</option>
+                  {@const st = optionStatus('dec1', d)}
+                  <option value={d} disabled={st.state === 'unavailable'} title={st.state === 'ok' ? undefined : st.reason}>{optionLabel(decendioOptionLabel(d), st, Number(d) === Number(p0Dec1))}</option>
                 {/each}
               </select>
             </div>
@@ -547,7 +560,8 @@
               <label for="p0-j2">Year 1: second crop (J2)</label>
               <select id="p0-j2" bind:value={p0J2}>
                 {#each j2Crops as c}
-                  <option value={c}>{cropDisplayName(c)}</option>
+                  {@const st = optionStatus('j2', c)}
+                  <option value={c} disabled={st.state === 'unavailable'} title={st.state === 'ok' ? undefined : st.reason}>{optionLabel(cropDisplayName(c), st, c === p0J2)}</option>
                 {/each}
               </select>
             </div>
@@ -556,7 +570,8 @@
               <label for="p0-j3">Year 2: main crop (J3)</label>
               <select id="p0-j3" bind:value={p0J3}>
                 {#each j3Crops as c}
-                  <option value={c}>{cropDisplayName(c)}</option>
+                  {@const st = optionStatus('j3', c)}
+                  <option value={c} disabled={st.state === 'unavailable'} title={st.state === 'ok' ? undefined : st.reason}>{optionLabel(cropDisplayName(c), st, c === p0J3)}</option>
                 {/each}
               </select>
             </div>
@@ -565,7 +580,8 @@
               <label for="p0-dec3">Year 2: sowing period</label>
               <select id="p0-dec3" bind:value={p0Dec3}>
                 {#each j3Decs as d}
-                  <option value={d}>{decendioOptionLabel(d)}</option>
+                  {@const st = optionStatus('dec3', d)}
+                  <option value={d} disabled={st.state === 'unavailable'} title={st.state === 'ok' ? undefined : st.reason}>{optionLabel(decendioOptionLabel(d), st, Number(d) === Number(p0Dec3))}</option>
                 {/each}
               </select>
             </div>
@@ -574,17 +590,31 @@
               <label for="p0-j4">Year 2: second crop (J4)</label>
               <select id="p0-j4" bind:value={p0J4}>
                 {#each j4Crops as c}
-                  <option value={c}>{cropDisplayName(c)}</option>
+                  {@const st = optionStatus('j4', c)}
+                  <option value={c} disabled={st.state === 'unavailable'} title={st.state === 'ok' ? undefined : st.reason}>{optionLabel(cropDisplayName(c), st, c === p0J4)}</option>
                 {/each}
               </select>
             </div>
           </div>
 
+          {#if availability && !availability.currentFeasible}
+            <div class="warning-banner mt-3" role="status" data-testid="p0-feasibility-note">
+              This current plan (P0) is not feasible under ZARC ≤ 20% for {activeInputs.ad_class} / {TEXTURE_LABELS[activeInputs.texture]}: {availability.currentReasons.join('; ')}.
+              You can still compare: P0 is then reported as infeasible and left out of the regret comparisons.
+            </div>
+          {:else if availability}
+            <p class="help-text m-0 mt-2" data-testid="p0-availability-note">
+              Options marked "unavailable" are never part of a feasible plan for {activeInputs.ad_class} / {TEXTURE_LABELS[activeInputs.texture]} (ZARC ≤ 20% and calendar); the reason is shown next to them.
+            </p>
+          {:else if runResult}
+            <p class="help-text m-0 mt-2" data-testid="p0-availability-note">
+              Soil changed: option availability will be shown after "Compare rotations".
+            </p>
+          {/if}
+
           <div class="form-actions">
             <p class="help-text m-0">
-              AD4 + clay is a demo assumption, not a measured soil classification. Weights must sum to 1.
-              Second-crop sowing follows harvest. ZARC risk is fixed at 20%; an infeasible P0 is excluded from regret comparisons, never repaired silently.
-              Do not tune inputs to improve historical test results.
+              Weights must add up to 1. Second crops are sown after the main-crop harvest.
             </p>
             <div class="flex gap-2 items-center">
               <button
@@ -610,6 +640,7 @@
         </form>
       </section>
 
+
       {#if formError}
         <div class="error-banner mb-4" role="alert" data-testid="form-error">
           {formError}
@@ -622,15 +653,120 @@
           {weightsInvalid ? 'Fix the weights, then select "Compare rotations" to update them.' : 'Select "Compare rotations" to update them.'}
         </div>
       {/if}
+{/snippet}
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-icon">F<span class="brand-dot">.</span></span>
+      <span class="brand-word">FieldShift<small>OPTIMIZER</small></span>
+    </div>
+    <div class="section-label">Workspace</div>
+    <nav class="navigation" aria-label="Primary navigation">
+      {#each TABS as item}
+        <button
+          type="button"
+          class:active={activeTab === item}
+          aria-current={activeTab === item ? 'page' : undefined}
+          onclick={() => selectTab(item)}
+        >
+          <span class="nav-mark">
+            {item === 'Overview'
+              ? '◈'
+              : item === 'Policy comparison'
+                ? '≋'
+                : item === 'Pareto and alternatives'
+                  ? '◇'
+                  : item === 'Retrospective evaluation'
+                    ? '▣'
+                    : item === 'Weight sensitivity'
+                      ? '⊞'
+                      : '▤'}
+          </span>
+          {item}
+        </button>
+      {/each}
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="sidebar-tag"><span class="status-dot"></span> Verified NASA snapshot</div>
+      <p>Rio Verde · Goiás · Brazil</p>
+      <p>Rainfed · 2 agricultural years · 4 windows</p>
+      <p>NASA POWER / ZARC 2026–27</p>
+      <a
+        href="https://github.com/Marcux777/fieldshift-optimizer"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        View source on GitHub ↗
+      </a>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <header class="topbar">
+      <div class="breadcrumb">
+        FieldShift Optimizer <span>/</span> <strong>{activeTab}</strong>
+      </div>
+      <div class="topbar-right">
+        <a
+          class="topbar-source-link"
+          href="https://github.com/Marcux777/fieldshift-optimizer"
+          target="_blank"
+          rel="noopener noreferrer"
+          data-testid="topbar-github-link"
+        >
+          Source on GitHub ↗
+        </a>
+        {#if exploratory}
+          <span class="mode-pill exploratory" data-testid="mode-pill">EXPLORATORY RUN</span>
+        {:else}
+          <span class="mode-pill" data-testid="mode-pill">COMPUTED IN RUST · PROTOCOL v1.1</span>
+        {/if}
+      </div>
+    </header>
+
+    <div class="content-wrap">
+      <section class="intro" aria-labelledby="intro-heading" data-testid="tool-intro">
+        <h1 id="intro-heading" class="intro-title">Which crop rotation holds up best when the weather varies?</h1>
+        <p class="intro-lead">
+          FieldShift Optimizer compares a farm's current two-year crop rotation with three optimized alternatives for rainfed fields in Rio Verde, Goiás, using NASA POWER daily climate history and the ZARC sowing-risk limits.
+          It is a decision-support tool for farmers and their advisers choosing a rotation under climate uncertainty: it shows how each plan would have fared in past climate years and does not predict yield, profit or future weather.
+        </p>
+        <details class="glossary" bind:open={glossaryOpen} data-testid="glossary">
+          <summary>Glossary: P0–P2, regret, minimax regret, M1–M5, LOO Hamming, ZARC, Pareto, held-out</summary>
+          <dl>
+            {#each GLOSSARY as g}
+              <div class="glossary-entry" id={`glossary-${g.id}`} tabindex="-1">
+                <dt>{g.term}</dt>
+                <dd>
+                  {g.definition}
+                  <span class="glossary-source">Source: {g.source}</span>
+                </dd>
+              </div>
+            {/each}
+          </dl>
+        </details>
+      </section>
+
+      <div class="banner-stack">
+        <div class="info-banner" role="note" data-testid="disclaimer-banner">
+          Decision support only: it does not replace the farmer's judgment, and it makes no yield, profit, water or soil claims.
+          <a href="#section-sources" onclick={(e) => { e.preventDefault(); selectTab('Sources and limitations'); }}>Full scope and limitations</a>.
+        </div>
+      </div>
+
+      <p class="sr-only" aria-live="polite" data-testid="results-live-region">{liveMessage}</p>
 
       {#if loading}
         <div class="panel" role="status">
           <p class="m-0 font-semibold">Comparing rotations with the verified offline NASA snapshot…</p>
         </div>
+        {@render inputsPanel()}
       {:else if fatalError}
         <div class="error-banner" role="alert">
           <strong>Research evidence is unavailable:</strong> {fatalError}. The application does not substitute simulated or invented data.
         </div>
+        {@render inputsPanel()}
       {:else if runResult && evalReport}
         {#if exploratory}
           <div class="warning-banner mb-4" role="status" data-testid="exploratory-warning">
@@ -640,7 +776,7 @@
 
         <div class="flex items-baseline justify-between flex-wrap gap-3 mb-4">
           <div>
-            <h2 class="text-2xl font-extrabold m-0" data-testid="outcome-heading">
+            <h2 id="results-heading" tabindex="-1" class="text-2xl font-extrabold m-0 scroll-target" data-testid="outcome-heading">
               {outcomeHeading}
             </h2>
             <p class="help-text m-0 mt-1">
@@ -656,10 +792,12 @@
           <div class="error-banner mb-4" role="alert" data-testid="infeasible-error">
             INFEASIBLE: no rotation satisfies the fixed ZARC and calendar constraints.
           </div>
+          {@render inputsPanel()}
         {:else if runResult.status === 'DADOS_INSUFICIENTES'}
           <div class="error-banner mb-4" role="alert" data-testid="insufficient-error">
             INSUFFICIENT DATA: too few complete historical pairs; no recommendation.
           </div>
+          {@render inputsPanel()}
         {:else}
           <!-- Active Tab Content -->
           {#if activeTab === 'Overview'}
@@ -672,11 +810,10 @@
               </div>
               <div class="verdict-flex">
                 <div>
-                  <h2>{evalReport.headline}</h2>
+                  <h2 data-testid="verdict-text">{verdictText(primaryComparison) || formatOutcomeLabel(evalReport.outcome)}</h2>
                   <p>
-                    Out-of-sample worst-case regret for P2 ({fmtNum(primaryComparison?.m1_a)}) vs P1b ({fmtNum(primaryComparison?.m1_b)}).
-                    95% block-bootstrap CI of median difference spans [{fmtSigned(primaryComparison?.ci95_median_D?.[0])}, {fmtSigned(primaryComparison?.ci95_median_D?.[1])}].
-                    The contribution is a reproducible comparison tool, not method superiority.
+                    Maximum regret on the held-out years (lower is better) and the paired difference D = regret(P2) − regret(P1b), with its 95% block-bootstrap CI.
+                    <a href="#classification-rule" class="verdict-link">How the classification is decided</a>.
                   </p>
                 </div>
                 <div class="verdict-number">
@@ -785,8 +922,10 @@
             </div>
           {/if}
 
+          {@render inputsPanel()}
+
           {#if activeTab === 'Policy comparison' || activeTab === 'Overview'}
-            <section class="panel" data-testid="policy-comparison-section">
+            <section class="panel scroll-target" id="section-policy-comparison" tabindex="-1" data-testid="policy-comparison-section">
               <div class="panel-header">
                 <div>
                   <span class="overline">Policy Comparison</span>
@@ -837,14 +976,14 @@
                     <div class="flex items-center justify-between mb-2">
                       <strong>{key}: {POLICY_LABELS[key]}</strong>
                       <span class="text-xs font-mono px-2 py-0.5 rounded bg-slate-100">
-                        {entry?.status ?? '—'}
+                        {entry?.status ? policyStatusLabel(entry.status) : '—'}
                       </span>
                     </div>
                     <p class="help-text m-0 mb-3">{POLICY_DESCRIPTIONS[key]}</p>
 
                     {#if entry && entry.status !== 'OK'}
                       <div class="warning-banner mb-2" data-testid={`p0-infeasible-warning-${key}`}>
-                        INFEASIBLE (INVIAVEL_SOB_ZARC): P0 violates ZARC 20% / calendar rules and is excluded from regret. Feasible alternatives remain available.
+                        Infeasible under ZARC ≤ 20%: this current plan breaks the ZARC 20% risk limit or the calendar rules, so it is left out of the regret comparisons. The optimized plans are still compared.
                       </div>
                       {#each formatP0Diagnostics(entry.reasons) as diag}
                         <p class="text-xs text-amber-900 m-0 mb-1" data-testid="p0-diagnostic-line">
@@ -895,7 +1034,7 @@
           {/if}
 
           {#if activeTab === 'Pareto and alternatives' || activeTab === 'Overview'}
-            <section class="panel" data-testid="pareto-section">
+            <section class="panel scroll-target" id="section-pareto" tabindex="-1" data-testid="pareto-section">
               <div class="panel-header">
                 <div>
                   <span class="overline">Multi-Objective Trade-Offs</span>
@@ -958,7 +1097,7 @@
           {/if}
 
           {#if activeTab === 'Retrospective evaluation' || activeTab === 'Overview'}
-            <section class="panel" data-testid="retrospective-evaluation-section">
+            <section class="panel scroll-target" id="section-retrospective" tabindex="-1" data-testid="retrospective-evaluation-section">
               <div class="panel-header">
                 <div>
                   <span class="overline">Retrospective Evaluation</span>
@@ -1072,7 +1211,7 @@
           {/if}
 
           {#if activeTab === 'Weight sensitivity' || activeTab === 'Overview'}
-            <section class="panel" data-testid="weight-sensitivity-section">
+            <section class="panel scroll-target" id="section-weight-sensitivity" tabindex="-1" data-testid="weight-sensitivity-section">
               <div class="panel-header">
                 <div>
                   <span class="overline">Weight Sensitivity</span>
@@ -1125,7 +1264,7 @@
         {/if}
 
         {#if activeTab === 'Sources and limitations' || activeTab === 'Overview'}
-          <section class="panel" data-testid="sources-section">
+          <section class="panel scroll-target" id="section-sources" tabindex="-1" data-testid="sources-section">
             <div class="panel-header">
               <div>
                 <span class="overline">Traceable Provenance</span>
@@ -1169,6 +1308,15 @@
               </p>
             {/if}
 
+            <h4 class="text-sm font-bold mt-4 mb-2">Scope of this tool</h4>
+            <ul class="scope-list" data-testid="scope-notes">
+              <li data-testid="full-disclaimer">{DISCLAIMER}</li>
+              <li data-testid="frozen-outcome-banner">{FROZEN_OUTCOME_BANNER}</li>
+              <li>The contribution is a reproducible comparison tool, not a claim that one method is superior. No claims of yield, profit, water savings or soil recovery.</li>
+              <li>AD4 + clay is a demo assumption, not a measured soil classification. ZARC risk is fixed at 20%; an infeasible current plan (P0) is excluded from regret comparisons and never repaired silently.</li>
+              <li>Do not tune inputs to improve historical test results: runs with changed inputs are exploratory.</li>
+            </ul>
+
             <h4 class="text-sm font-bold mt-4 mb-2">Known limitations &amp; modeling assumptions</h4>
             <ul class="limitations">
               {#each limitations?.items ?? evalReport.limitations as item}
@@ -1203,9 +1351,11 @@
         {/if}
 
         <footer>
-          <span>Decision-support only. No claims of yield, profit, water savings, soil recovery or method superiority.</span>
+          <a href="https://github.com/Marcux777/fieldshift-optimizer" target="_blank" rel="noopener noreferrer">Source on GitHub ↗</a>
           <span>FieldShift Optimizer · NASA Space Apps 2026</span>
         </footer>
+      {:else}
+        {@render inputsPanel()}
       {/if}
     </div>
   </main>

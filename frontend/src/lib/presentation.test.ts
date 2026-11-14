@@ -205,3 +205,52 @@ describe('glossary', () => {
     }
   });
 });
+
+describe('Level B: verdict text, status labels, weight presets and P0 option availability', () => {
+  it('builds the English verdict from the primary comparison, not from the Portuguese headline', async () => {
+    const { verdictText } = await import('./presentation');
+    const primary = goldenEval.comparisons.find((c) => c.a === 'P2' && c.b === 'P1b')!;
+    const text = verdictText(primary);
+    expect(text).toBe(
+      'NEGATIVE: minimax regret (P2) did not reduce maximum test regret versus expected loss (P1b) — 0.1744 vs 0.1466; median D +0.0064, 95% CI [-0.0609, +0.0375].'
+    );
+    expect(text).not.toMatch(/NEGATIVO|perda|não/);
+  });
+
+  it('labels policy statuses in plain English', async () => {
+    const { policyStatusLabel } = await import('./presentation');
+    expect(policyStatusLabel('OK')).toBe('Feasible');
+    expect(policyStatusLabel('INVIAVEL_SOB_ZARC')).toBe('Infeasible under ZARC ≤ 20%');
+    expect(policyStatusLabel('SOMETHING_NEW')).toBe('Something new');
+  });
+
+  it('offers the 15 fixed weight settings as presets and recognises custom weights', async () => {
+    const { weightPresets, matchPreset } = await import('./presentation');
+    const presets = weightPresets(goldenRun as unknown as { weight_grid: number[][] } & RunResult, [0.5, 0.25, 0.25]);
+    expect(presets).toHaveLength(15);
+    expect(presets[4]).toEqual({ value: '4', weights: [0.5, 0.25, 0.25], label: '0.50 / 0.25 / 0.25 (default)' });
+    expect(matchPreset(presets, [0.5, 0.25, 0.25])).toBe('4');
+    expect(matchPreset(presets, [0.4, 0.3, 0.3])).toBe('custom');
+  });
+
+  it('derives P0 option availability from the feasible plans and rejections of the run', async () => {
+    const { p0Availability, rejectionReasonLabel } = await import('./presentation');
+    const av = p0Availability(goldenRun, CATALOG, CATALOG.default_p0);
+    expect(av.currentFeasible).toBe(true);
+    expect(av.status('dec1', 27)).toEqual({ state: 'unavailable', reason: 'ZARC risk 40% > 20%' });
+    expect(av.status('dec1', 25)).toEqual({ state: 'unavailable', reason: 'not indicated by ZARC for this soil' });
+    expect(av.status('dec3', 26).state).toBe('unavailable');
+    expect(av.status('dec1', 28).state).toBe('ok');
+    // Soybean sown in decendio 33 is feasible in other plans, but not followed by second-season maize.
+    expect(av.status('dec1', 33).state).toBe('conflict');
+    // First-season maize exists in feasible plans, but not with the current sowing period 29.
+    expect(av.status('j1', 'milho_1a').state).toBe('conflict');
+    const maize = p0Availability(goldenRun, CATALOG, { ...CATALOG.default_p0, j1: 'milho_1a' });
+    expect(maize.currentFeasible).toBe(false);
+    expect(maize.currentReasons[0]).toContain('J1');
+    expect(maize.status('dec1', 29)).toEqual({ state: 'unavailable', reason: 'ZARC risk 30% > 20%' });
+    expect(
+      rejectionReasonLabel({ reason: 'SEM_DECENDIO_ZARC_APOS_COLHEITA', detail: 'colheita anterior em 16/fev' })
+    ).toBe('no ZARC sowing period ≤ 20% after the previous harvest');
+  });
+});

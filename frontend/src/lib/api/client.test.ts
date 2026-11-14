@@ -186,3 +186,59 @@ describe('FieldShift OpenAPI boundary and domain logic', () => {
     );
   });
 });
+
+describe('retry on busy API responses (item A1)', () => {
+  const golden = goldenRunJson as unknown as RunResult;
+
+  function busy(status: number, retryAfter?: string): Response {
+    return new Response(JSON.stringify({ error: { code: 'BUSY', message: 'busy' } }), {
+      status,
+      headers: retryAfter ? { 'Retry-After': retryAfter } : {}
+    });
+  }
+
+  it('retries 429 and 503 with backoff (honouring Retry-After) and then returns the result', async () => {
+    const responses = [busy(429), busy(503, '2'), new Response(JSON.stringify(golden), { status: 200 })];
+    const sleeps: number[] = [];
+    let calls = 0;
+    const client = createOpenApiClient({
+      fetchFn: async () => {
+        calls += 1;
+        return responses.shift() as Response;
+      },
+      retry: { maxRetries: 3, baseDelayMs: 400, maxDelayMs: 5000, sleep: async (ms) => void sleeps.push(ms) }
+    });
+    const run = await client.run(DEFAULT_INPUTS);
+    expect(run.result_hash).toBe(golden.result_hash);
+    expect(calls).toBe(3);
+    expect(sleeps).toEqual([400, 2000]);
+  });
+
+  it('gives up after maxRetries and surfaces the last busy error', async () => {
+    const sleeps: number[] = [];
+    let calls = 0;
+    const client = createOpenApiClient({
+      fetchFn: async () => {
+        calls += 1;
+        return busy(503, '60');
+      },
+      retry: { maxRetries: 2, baseDelayMs: 300, maxDelayMs: 5000, sleep: async (ms) => void sleeps.push(ms) }
+    });
+    await expect(client.evaluate(DEFAULT_INPUTS)).rejects.toMatchObject({ status: 503, code: 'BUSY' });
+    expect(calls).toBe(3);
+    expect(sleeps).toEqual([5000, 5000]);
+  });
+
+  it('does not retry validation errors', async () => {
+    let calls = 0;
+    const client = createOpenApiClient({
+      fetchFn: async () => {
+        calls += 1;
+        return new Response(JSON.stringify({ error: { code: 'INVALID_INPUT', message: 'bad' } }), { status: 422 });
+      },
+      retry: { maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1, sleep: async () => undefined }
+    });
+    await expect(client.run(DEFAULT_INPUTS)).rejects.toMatchObject({ status: 422 });
+    expect(calls).toBe(1);
+  });
+});
