@@ -1,6 +1,6 @@
 # Progress (Development Lead)
 
-Estado em 14/11/2026 ~15h30 (Brasília). Fonte de verdade: commits, `reports/` e a saída dos testes.
+Estado em 14/11/2026 ~16h (Brasília). Fonte de verdade: commits, `reports/` e a saída dos testes.
 
 | Item | Estado | Evidência |
 | --- | --- | --- |
@@ -10,6 +10,7 @@ Estado em 14/11/2026 ~15h30 (Brasília). Fonte de verdade: commits, `reports/` e
 | Avaliação retrospectiva | Feito; desfecho NEGATIVO | `reports/eval_runs.md` |
 | App Streamlit | Feito, local; instalação isolada a partir do `git archive` OK | `tests/test_app.py`, `docs/assets/` |
 | Documentação em inglês | Feita; faltam URLs, equipe, mídia SI, demo | `README.md`, `docs/SUBMISSION.md` |
-| Testes | `168 passed`; `ruff` limpo | contêiner `fieldshift-dev` |
-| Revisão independente (VSDD Reviewer) | PENDENTE: fora do canal | — |
-| Repositório público, deploy Cloud, demo, submissão | PENDENTE: ação do usuário | — |
+| Testes | `170 passed`; `ruff` limpo | contêiner `fieldshift-dev` |
+| Revisão independente | VSDD: APROVADO COM RESSALVAS (sem bloqueante); Critical Reviewer: COM RESSALVAS; correções aplicadas, sem nova rodada | commits `da19828`, `4be59f1` |
+| Repositório público | Criado (vazio até o push do HEAD final); push pelo Software Engineer | https://github.com/Marcux777/fieldshift-optimizer |
+| Deploy Cloud, demo, equipe, mídia SI, submissão | PENDENTE: ação do usuário | — |
