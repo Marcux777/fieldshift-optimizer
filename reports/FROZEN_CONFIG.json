@@ -1,0 +1,107 @@
+{
+  "frozen_utc": "2026-11-14T18:11:22Z",
+  "config": {
+    "protocol_version": "1.1",
+    "protocol_file_sha256": "ee8e51c5b2eecc7319818a5645ef15b84d677eabab35caad1a7e9fc41deaefb9",
+    "protocol_config_hash": "564e613d2129ffe7b65bb8bbab9261deca9e042634556b135313c41353a2896c",
+    "optimizer_config_hash": "bafc01e67a2cec024f63667bc6793a89d5ffdfe6c97dc7b9a6954fdd5be32da7",
+    "snapshot_id": "power-daily-2.10.3-lat-18_lon-50.625-46c276253b44",
+    "soil": {
+      "ad_class": "AD4",
+      "texture": "argilosa"
+    },
+    "weights": [
+      0.5,
+      0.25,
+      0.25
+    ],
+    "weight_grid": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.75,
+        0.25,
+        0.0
+      ],
+      [
+        0.75,
+        0.0,
+        0.25
+      ],
+      [
+        0.5,
+        0.5,
+        0.0
+      ],
+      [
+        0.5,
+        0.25,
+        0.25
+      ],
+      [
+        0.5,
+        0.0,
+        0.5
+      ],
+      [
+        0.25,
+        0.75,
+        0.0
+      ],
+      [
+        0.25,
+        0.5,
+        0.25
+      ],
+      [
+        0.25,
+        0.25,
+        0.5
+      ],
+      [
+        0.25,
+        0.0,
+        0.75
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.75,
+        0.25
+      ],
+      [
+        0.0,
+        0.5,
+        0.5
+      ],
+      [
+        0.0,
+        0.25,
+        0.75
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "p0_spec": {
+      "j1": "soja",
+      "dec1": 29,
+      "j2": "milho_2a",
+      "j3": "soja",
+      "dec3": 29,
+      "j4": "milho_2a"
+    },
+    "seed": 20261114,
+    "epsilon": 0.02
+  },
+  "sha256": "067e569ec333fc7b7dcff85d925732f3746bf2f6525fd7f4d38e6935f64cbad1"
+}
