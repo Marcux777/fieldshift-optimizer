@@ -33,7 +33,7 @@ FieldShift Optimizer: app web (Streamlit) de apoio à decisão para rotação de
 
 ## Comandos
 
-Python no host via uv: `uv sync`, `uv run pytest -q`, `uv run ruff check .`. Dependências entram a partir de 14/11 às 9h.
+Decisão do usuário (13/11): todo Python (instalação, testes, lint, app) roda em container Docker do projeto, com Python 3.12 e uv dentro da imagem. Não criar ambiente Python no host. Antes do primeiro comando ou arquivo Docker, ler `~/.codex/instructions/docker.md`. Plano em `docs/planning/` (cópia de `prep/container-plan.md` entra em 14/11). Dockerfile, Compose e dependências entram a partir de 14/11 às 9h.
 
 ## Regras do projeto
 
