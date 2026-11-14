@@ -1,0 +1,86 @@
+{
+  "manifest_schema": 1,
+  "snapshot_id": "power-daily-2.10.3-lat-18_lon-50.625-46c276253b44",
+  "collected_utc": "2026-11-14T17:58:06Z",
+  "source": {
+    "service": "NASA POWER Daily API",
+    "api_version": "v2.10.3",
+    "sources": [
+      "MERRA2",
+      "POWER"
+    ],
+    "community": "AG",
+    "time_standard": "LST"
+  },
+  "request": {
+    "url": "https://power.larc.nasa.gov/api/temporal/daily/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN&community=AG&longitude=-50.625&latitude=-18&start=19810101&end=20251231&format=JSON",
+    "parameters": [
+      "PRECTOTCORR",
+      "T2M",
+      "T2M_MAX",
+      "T2M_MIN"
+    ],
+    "requested_latitude": -18.0,
+    "requested_longitude": -50.625,
+    "returned_geometry": {
+      "longitude": -50.625,
+      "latitude": -18.0,
+      "elevation_m": 625.31
+    },
+    "start": "19810101",
+    "end": "20251231",
+    "format": "JSON"
+  },
+  "fill_value": -999.0,
+  "units": {
+    "PRECTOTCORR": "mm/day",
+    "T2M": "C",
+    "T2M_MAX": "C",
+    "T2M_MIN": "C"
+  },
+  "rows": 16436,
+  "date_min": "1981-01-01",
+  "date_max": "2025-12-31",
+  "missing_fill_counts": {
+    "PRECTOTCORR": 0,
+    "T2M": 0,
+    "T2M_MAX": 0,
+    "T2M_MIN": 0
+  },
+  "known_gaps": [],
+  "files": {
+    "raw": {
+      "path": "raw/power_daily.json.gz",
+      "sha256": "2c5539841f759d06da232a174faaa300fb9370541facb103db62135bd62f6e32",
+      "bytes": 275087,
+      "uncompressed_sha256": "fd480db9b5892ad7cdba3e5a9c861ffeaa65036f57898d864bcd7974d3dee732",
+      "uncompressed_bytes": 1092954,
+      "content_sha256": "46c276253b4435ba8e996b208fc953365b5ae13d845296b4f5dc37f0369095fe",
+      "content_hash_note": "sha256 do JSON canônico sem o campo volátil 'times'"
+    },
+    "parquet": {
+      "path": "daily.parquet",
+      "sha256": "0025a0aedcfed547fe5d02dfefebfbbd5659b95e34ef770d1bfcb1d8aa689c7f",
+      "bytes": 243282,
+      "schema": {
+        "PRECTOTCORR": "float64",
+        "T2M": "float64",
+        "T2M_MAX": "float64",
+        "T2M_MIN": "float64"
+      },
+      "index": "date (datetime64[ns])"
+    }
+  },
+  "tool_versions": {
+    "python": "3.12.16",
+    "pandas": "3.1.1",
+    "numpy": "2.5.4",
+    "pyarrow": "26.0.1"
+  },
+  "citation": {
+    "reference": "The data was obtained from National Aeronautics and Space Administration (NASA) Langley Research Center's Prediction Of Worldwide Energy Resources (POWER) project funded through the NASA Earth Science Division.",
+    "data_reference": "The data was obtained from the POWER Project's Daily v2.10.3 version on 2026/11/14.",
+    "referencing_guide": "https://power.larc.nasa.gov/docs/referencing/",
+    "note": "O POWER pede nome do serviço, versão e data de acesso. Texto de licença formal não foi localizado na página de referência; não afirmar licença."
+  }
+}
