@@ -1,0 +1,481 @@
+// AI-assisted (OpenBot agent)
+//! Integration, contract, and differential tests for `fieldshift-api` (E7).
+//!
+//! Verifies all HTTP endpoints, boundary validation, error status codes,
+//! bit-for-bit parity against `fixtures/reference/` (E0), and the ported
+//! edge cases from `tests/test_pipeline.py`.
+
+use std::path::PathBuf;
+
+use axum::{
+    body::Body,
+    http::{header, Method, Request, StatusCode},
+    Router,
+};
+use fieldshift_api::{
+    engine::{CurrentPlan, Engine, Inputs},
+    router,
+};
+use http_body_util::BodyExt;
+use serde_json::{json, Value};
+use tower::ServiceExt;
+
+fn repo_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..")
+}
+
+fn load_fixture(name: &str) -> Value {
+    let path = repo_root().join("fixtures/reference").join(name);
+    let raw = std::fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("failed to read fixture {}: {e}", path.display()));
+    serde_json::from_str(&raw).expect("valid fixture JSON")
+}
+
+fn test_app() -> Router {
+    let engine = Engine::load(&repo_root()).expect("engine loads from verified root");
+    router(engine, None, Vec::new())
+}
+
+async fn send_request(app: &Router, req: Request<Body>) -> (StatusCode, Value) {
+    let resp = app
+        .clone()
+        .oneshot(req)
+        .await
+        .expect("router handles request");
+    let status = resp.status();
+    let bytes = resp
+        .into_body()
+        .collect()
+        .await
+        .expect("body bytes")
+        .to_bytes();
+    let val = serde_json::from_slice(&bytes)
+        .unwrap_or_else(|_| json!({ "raw": String::from_utf8_lossy(&bytes) }));
+    (status, val)
+}
+
+async fn get_json(app: &Router, uri: &str) -> (StatusCode, Value) {
+    let req = Request::builder()
+        .method(Method::GET)
+        .uri(uri)
+        .body(Body::empty())
+        .expect("request");
+    send_request(app, req).await
+}
+
+async fn post_json(app: &Router, uri: &str, body: &Value) -> (StatusCode, Value) {
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri(uri)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(serde_json::to_vec(body).expect("json bytes")))
+        .expect("request");
+    send_request(app, req).await
+}
+
+fn diff_json(path: &str, actual: &Value, expected: &Value, out: &mut Vec<String>) {
+    match (actual, expected) {
+        (Value::Object(a), Value::Object(b)) => {
+            for k in a.keys().chain(b.keys().filter(|k| !a.contains_key(*k))) {
+                diff_json(
+                    &format!("{path}.{k}"),
+                    a.get(k).unwrap_or(&Value::Null),
+                    b.get(k).unwrap_or(&Value::Null),
+                    out,
+                );
+            }
+        }
+        (Value::Array(a), Value::Array(b)) if a.len() == b.len() => {
+            for (i, (x, y)) in a.iter().zip(b.iter()).enumerate() {
+                diff_json(&format!("{path}[{i}]"), x, y, out);
+            }
+        }
+        _ if actual != expected => {
+            out.push(format!("{path}: actual={actual} expected={expected}"));
+        }
+        _ => {}
+    }
+}
+
+#[tokio::test]
+async fn health_meta_catalog_provenance_limitations_and_openapi() {
+    let app = test_app();
+    let golden_run = load_fixture("golden_run_result.json");
+
+    for path in ["/health", "/v1/health"] {
+        let (status, health) = get_json(&app, path).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            health,
+            json!({
+                "status": "ok",
+                "language": "Rust",
+                "mode": "computed",
+                "recomputation_available": true
+            })
+        );
+    }
+
+    let (status, meta) = get_json(&app, "/v1/meta").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(meta["language"], "Rust");
+    assert_eq!(meta["mode"], "computed");
+    assert_eq!(meta["protocol_version"], "1.1");
+    assert_eq!(meta["snapshot_id"], golden_run["snapshot_id"]);
+    assert_eq!(meta["config_hash"], golden_run["config_hash"]);
+    assert_eq!(
+        meta["protocol_sha256"],
+        "ee8e51c5b2eecc7319818a5645ef15b84d677eabab35caad1a7e9fc41deaefb9"
+    );
+
+    let (status, cat) = get_json(&app, "/v1/catalog").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(cat["crops"].as_array().expect("crops").len(), 6);
+    assert_eq!(cat["windows"].as_array().expect("windows").len(), 4);
+    assert_eq!(
+        cat["soils"],
+        json!(["AD1", "AD2", "AD3", "AD4", "AD5", "AD6"])
+    );
+    assert_eq!(cat["textures"], json!(["arenosa", "media", "argilosa"]));
+    assert_eq!(
+        cat["default_p0"],
+        json!({
+            "j1": "soja",
+            "dec1": 29,
+            "j2": "milho_2a",
+            "j3": "soja",
+            "dec3": 29,
+            "j4": "milho_2a"
+        })
+    );
+    assert_eq!(cat["weight_grid"].as_array().expect("grid").len(), 15);
+    assert_eq!(cat["risk_limit"], json!(0.2));
+
+    let (status, prov) = get_json(&app, "/v1/provenance").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(prov["manifest"]["snapshot_id"], golden_run["snapshot_id"]);
+    assert_eq!(prov["manifest"]["source"]["api_version"], "v2.10.3");
+    assert_eq!(
+        prov["protocol_sha256"],
+        "ee8e51c5b2eecc7319818a5645ef15b84d677eabab35caad1a7e9fc41deaefb9"
+    );
+
+    let (status, lim) = get_json(&app, "/v1/limitations").await;
+    assert_eq!(status, StatusCode::OK);
+    let items = lim["items"].as_array().expect("items");
+    assert_eq!(items.len(), 10);
+    assert!(items[0]
+        .as_str()
+        .expect("str")
+        .contains("does not replace the farmer"));
+
+    let (status, spec) = get_json(&app, "/v1/openapi.json").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(spec["openapi"], "3.0.3");
+    for route in [
+        "/v1/health",
+        "/v1/meta",
+        "/v1/catalog",
+        "/v1/plans",
+        "/v1/run",
+        "/v1/evaluate",
+        "/v1/pareto",
+        "/v1/provenance",
+        "/v1/limitations",
+    ] {
+        assert!(
+            spec["paths"].get(route).is_some(),
+            "missing route in openapi.json: {route}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn plans_endpoint_matches_all_8_soil_fixtures() {
+    let app = test_app();
+    let cases = [
+        ("AD1", "argilosa", "catalog_AD1_argilosa.json", 169usize),
+        ("AD2", "argilosa", "catalog_AD2_argilosa.json", 289),
+        ("AD3", "argilosa", "catalog_AD3_argilosa.json", 400),
+        ("AD4", "arenosa", "catalog_AD4_arenosa.json", 576),
+        ("AD4", "media", "catalog_AD4_media.json", 576),
+        ("AD4", "argilosa", "catalog_AD4_argilosa.json", 576),
+        ("AD5", "argilosa", "catalog_AD5_argilosa.json", 729),
+        ("AD6", "argilosa", "catalog_AD6_argilosa.json", 961),
+    ];
+
+    for (ad, tex, fixture_name, expected_n) in cases {
+        let (status, body) = post_json(
+            &app,
+            "/v1/plans",
+            &json!({
+                "ad_class": ad,
+                "texture": tex,
+                "weights": [0.5, 0.25, 0.25]
+            }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "failed on {ad}/{tex}");
+        assert_eq!(body["status"], "OK");
+        assert_eq!(body["n_plans"], expected_n, "count mismatch on {ad}/{tex}");
+
+        let fx = load_fixture(fixture_name);
+        let actual_ids: Vec<Value> = body["plans"]
+            .as_array()
+            .expect("plans")
+            .iter()
+            .map(|p| p["id"].clone())
+            .collect();
+        let expected_ids: Vec<Value> = fx["plans"]
+            .as_array()
+            .expect("fx plans")
+            .iter()
+            .map(|p| p["id"].clone())
+            .collect();
+        assert_eq!(actual_ids, expected_ids, "IDs/order mismatch on {ad}/{tex}");
+    }
+}
+
+#[tokio::test]
+async fn run_and_pareto_match_golden_run_result_bit_for_bit() {
+    let app = test_app();
+    let mut golden = load_fixture("golden_run_result.json");
+
+    let (status, mut run_resp) = post_json(&app, "/v1/run", &json!({})).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(run_resp["status"], "OK");
+    assert_eq!(run_resp["n_plans"], 576);
+    assert_eq!(
+        run_resp["result_hash"],
+        "b43703326690e6d0ddd2be48641fbdb9ba46908810ebfca0c8c90a379c79fd66"
+    );
+
+    // Explicitly passing default_p0 produces the exact same config_hash and result_hash.
+    let (status_explicit, run_explicit) = post_json(
+        &app,
+        "/v1/run",
+        &json!({
+            "ad_class": "AD4",
+            "texture": "argilosa",
+            "weights": [0.5, 0.25, 0.25],
+            "p0": {
+                "j1": "soja",
+                "dec1": 29,
+                "j2": "milho_2a",
+                "j3": "soja",
+                "dec3": 29,
+                "j4": "milho_2a"
+            }
+        }),
+    )
+    .await;
+    assert_eq!(status_explicit, StatusCode::OK);
+    assert_eq!(run_explicit["config_hash"], run_resp["config_hash"]);
+    assert_eq!(run_explicit["result_hash"], run_resp["result_hash"]);
+
+    // Compare all scientific fields (excluding runtime meta).
+    run_resp.as_object_mut().expect("obj").remove("meta");
+    golden.as_object_mut().expect("obj").remove("meta");
+    let mut diffs = Vec::new();
+    diff_json("$", &run_resp, &golden, &mut diffs);
+    assert!(
+        diffs.is_empty(),
+        "RunResult differed from golden fixture: {:#?}",
+        &diffs[..diffs.len().min(15)]
+    );
+
+    let (status_p, pareto_resp) = post_json(&app, "/v1/pareto", &json!({})).await;
+    assert_eq!(status_p, StatusCode::OK);
+    assert_eq!(pareto_resp["pareto"], golden["pareto"]);
+    assert_eq!(pareto_resp["objectives"], golden["objectives"]);
+    assert_eq!(pareto_resp["alternatives"], golden["alternatives"]);
+}
+
+#[tokio::test]
+async fn evaluate_matches_golden_eval_report_bit_for_bit_and_ad1_p0_diagnosis() {
+    let app = test_app();
+    let golden = load_fixture("golden_eval_report.json");
+
+    let (status, eval_resp) = post_json(&app, "/v1/evaluate", &json!({})).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(eval_resp["outcome"], "NEGATIVO");
+    assert_eq!(
+        eval_resp["result_hash"],
+        "504c28e85e54cbd4e9470e8a423499299dcbed643cb9b2ff8aa461873e134c18"
+    );
+
+    let mut diffs = Vec::new();
+    diff_json("$", &eval_resp, &golden, &mut diffs);
+    assert!(
+        diffs.is_empty(),
+        "EvalReport differed from golden fixture: {:#?}",
+        &diffs[..diffs.len().min(15)]
+    );
+
+    // AD1 exploratory case: P0 is infeasible under ZARC 20%, but 169 feasible plans remain.
+    let ad1_body = json!({
+        "ad_class": "AD1",
+        "texture": "argilosa",
+        "weights": [0.5, 0.25, 0.25]
+    });
+    let (status_r, ad1_run) = post_json(&app, "/v1/run", &ad1_body).await;
+    assert_eq!(status_r, StatusCode::OK);
+    assert_eq!(ad1_run["n_plans"], 169);
+    assert_eq!(ad1_run["policies"]["P0"]["status"], "INVIAVEL_SOB_ZARC");
+    let reasons = ad1_run["policies"]["P0"]["reasons"]
+        .as_array()
+        .expect("reasons");
+    assert!(reasons
+        .iter()
+        .any(|r| r.as_str().unwrap_or_default().contains("risco 30% > 20%")));
+
+    let (status_e, ad1_eval) = post_json(&app, "/v1/evaluate", &ad1_body).await;
+    assert_eq!(status_e, StatusCode::OK);
+    assert_eq!(ad1_eval["n_plans"], 169);
+    assert_eq!(ad1_eval["p0_status"], "inviavel_sob_ZARC_20");
+    assert_eq!(ad1_eval["policies"]["P0"]["feasible"], false);
+    assert_eq!(ad1_eval["policies"]["P1"]["feasible"], true);
+    assert_eq!(ad1_eval["policies"]["P1b"]["feasible"], true);
+    assert_eq!(ad1_eval["policies"]["P2"]["feasible"], true);
+}
+
+#[tokio::test]
+async fn boundary_validation_and_ported_pipeline_cases() {
+    // 1. Invalid weights fail validation before touching engine data (ported from test_pipeline.py).
+    for invalid_weights in [
+        [0.5, 0.5, 0.5],
+        [f64::NAN, 0.5, 0.5],
+        [-1.0, 1.0, 1.0],
+        [f64::INFINITY, 0.0, 0.0],
+    ] {
+        let inp = Inputs {
+            weights: invalid_weights,
+            ..Inputs::default()
+        };
+        let err = inp.validate().expect_err("invalid weights must fail");
+        assert!(err.contains("weights"));
+    }
+
+    // 2. Missing snapshot is not replaced by synthetic fallback.
+    let tmp = std::env::temp_dir().join("fs-api-missing-snapshot-test");
+    let _ = std::fs::remove_dir_all(&tmp);
+    assert!(Engine::load(&tmp).is_err());
+
+    // 3. HTTP boundary validation: 422, 400, 415, 413, 404, 405.
+    let app = test_app();
+    for bad_payload in [
+        json!({ "ad_class": "AD9", "texture": "argilosa", "weights": [0.5, 0.25, 0.25] }),
+        json!({ "ad_class": "AD4", "texture": "silte", "weights": [0.5, 0.25, 0.25] }),
+        json!({ "ad_class": "AD4", "texture": "argilosa", "weights": [0.9, 0.25, 0.25] }),
+        json!({ "ad_class": "AD4", "texture": "argilosa", "weights": [-0.5, 1.0, 0.5] }),
+        json!({
+            "ad_class": "AD4",
+            "texture": "argilosa",
+            "weights": [0.5, 0.25, 0.25],
+            "p0": { "j1": "soja", "dec1": 37, "j2": "milho_2a", "j3": "soja", "dec3": 29, "j4": "milho_2a" }
+        }),
+        json!({
+            "ad_class": "AD4",
+            "texture": "argilosa",
+            "weights": [0.5, 0.25, 0.25],
+            "p0": { "j1": "trigo", "dec1": 29, "j2": "milho_2a", "j3": "soja", "dec3": 29, "j4": "milho_2a" }
+        }),
+        json!({ "unknown_field": 123 }),
+    ] {
+        let (st, body) = post_json(&app, "/v1/run", &bad_payload).await;
+        assert_eq!(
+            st,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "payload: {bad_payload}"
+        );
+        assert!(body["error"]["code"].is_string());
+    }
+
+    // Malformed JSON -> 400
+    let bad_json_req = Request::builder()
+        .method(Method::POST)
+        .uri("/v1/run")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from("{broken"))
+        .expect("req");
+    let (st_bad_json, body_bad_json) = send_request(&app, bad_json_req).await;
+    assert_eq!(st_bad_json, StatusCode::BAD_REQUEST);
+    assert_eq!(body_bad_json["error"]["code"], "INVALID_JSON");
+
+    // Wrong Content-Type -> 415
+    let bad_ct_req = Request::builder()
+        .method(Method::POST)
+        .uri("/v1/run")
+        .header(header::CONTENT_TYPE, "text/plain")
+        .body(Body::from("{}"))
+        .expect("req");
+    let (st_ct, _) = send_request(&app, bad_ct_req).await;
+    assert_eq!(st_ct, StatusCode::UNSUPPORTED_MEDIA_TYPE);
+
+    // Payload > 64 KiB -> 413
+    let huge = format!("{{\"ad_class\":\"{}\"}}", "A".repeat(70 * 1024));
+    let huge_req = Request::builder()
+        .method(Method::POST)
+        .uri("/v1/run")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(huge))
+        .expect("req");
+    let (st_huge, _) = send_request(&app, huge_req).await;
+    assert_eq!(st_huge, StatusCode::PAYLOAD_TOO_LARGE);
+
+    // Unknown route -> 404, wrong method -> 405
+    let (st_404, body_404) = get_json(&app, "/v1/nonexistent").await;
+    assert_eq!(st_404, StatusCode::NOT_FOUND);
+    assert_eq!(body_404["error"]["code"], "NOT_FOUND");
+
+    let (st_405, body_405) = get_json(&app, "/v1/run").await;
+    assert_eq!(st_405, StatusCode::METHOD_NOT_ALLOWED);
+    assert_eq!(body_405["error"]["code"], "METHOD_NOT_ALLOWED");
+
+    // 4. Insufficient climate is explicit (ported from test_pipeline.py::test_insufficient_climate_is_explicit).
+    let short_engine = Engine::load(&repo_root())
+        .expect("load")
+        .with_truncated_climate(10)
+        .expect("truncate");
+    let short_app = router(short_engine, None, Vec::new());
+    let (st_sr, short_run) = post_json(&short_app, "/v1/run", &json!({})).await;
+    assert_eq!(st_sr, StatusCode::OK);
+    assert_eq!(short_run["status"], "DADOS_INSUFICIENTES");
+
+    let (st_se, short_eval) = post_json(&short_app, "/v1/evaluate", &json!({})).await;
+    assert_eq!(st_se, StatusCode::OK);
+    assert_eq!(short_eval["outcome"], "DADOS_INSUFICIENTES");
+    assert_eq!(short_eval["policies"], json!({}));
+
+    // 5. Empty feasible set is explicit (ported from test_pipeline.py::test_empty_feasible_set_is_explicit).
+    let inf_engine = Engine::load(&repo_root())
+        .expect("load")
+        .with_infeasible_zarc();
+    let inf_app = router(inf_engine, None, Vec::new());
+    let (st_ir, inf_run) = post_json(&inf_app, "/v1/run", &json!({})).await;
+    assert_eq!(st_ir, StatusCode::OK);
+    assert_eq!(inf_run["status"], "INVIAVEL");
+    assert_eq!(inf_run["n_plans"], 0);
+
+    let (st_ie, inf_eval) = post_json(&inf_app, "/v1/evaluate", &json!({})).await;
+    assert_eq!(st_ie, StatusCode::OK);
+    assert_eq!(inf_eval["outcome"], "INVIAVEL");
+    assert_eq!(inf_eval["policies"], json!({}));
+
+    let p0 = CurrentPlan {
+        j1: "soja".into(),
+        dec1: 29,
+        j2: "milho_2a".into(),
+        j3: "soja".into(),
+        dec3: 29,
+        j4: "milho_2a_braquiaria".into(),
+    };
+    assert_eq!(
+        Inputs {
+            p0: Some(p0),
+            ..Inputs::default()
+        }
+        .validate(),
+        Ok(())
+    );
+}

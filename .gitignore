@@ -47,3 +47,4 @@ data/raw/
 data/cache/
 reports/generated/
 /backend/target/
+/artifacts/

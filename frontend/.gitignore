@@ -1,0 +1,6 @@
+# AI-assisted (OpenBot agent)
+node_modules/
+.svelte-kit/
+build/
+playwright-report/
+test-results/

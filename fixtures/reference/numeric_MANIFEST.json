@@ -1,0 +1,8 @@
+{
+  "baseline": "16cc391318b57fbf44a31c75c994fbb0683b3115",
+  "numpy": "2.5.4",
+  "files": {
+    "numeric_vectors.json": "71fac55263a3d3a6490e3e323684f03176980bd8ce452127c1bce736bac95da7",
+    "canon_vectors.json": "455b7a64384456c4cefa09e2bfa4b6ad13df698c79c950614cb1131563ef7e5a"
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "baseline_commit": "16cc391318b57fbf44a31c75c994fbb0683b3115",
+  "command": "docker compose -f compose.oracle.yaml exec -T oracle python tools/reference/dump_reference.py",
+  "files": {
+    "catalog_AD1_argilosa.json": "1bb3506cfca5519c8fe0e277472fc15c0d6386c67beb8a5ecb62d93b1b8a02a7",
+    "catalog_AD2_argilosa.json": "6093b66b09b04c55c76bae343007226f142d6bc01892e3f1376a83376ada9b91",
+    "catalog_AD3_argilosa.json": "305772e957dc0bbc47ad268ffe5b0a4dffa54d6d76eaaac46f19b2f91fb51637",
+    "catalog_AD4_arenosa.json": "fa49254eb0e4b54e6a8725761468e7deb38b0c09e9dc97f26608e94835cc3112",
+    "catalog_AD4_argilosa.json": "b0c024d2f0b922fdc4da6272a09f3ba24f3ca8c09fd821da111ab430aaab677e",
+    "catalog_AD4_media.json": "f48952658542e63b422223ecbccd5d61d51263b0e0dc366765a5dcf25cf71a55",
+    "catalog_AD5_argilosa.json": "ab856078fe84c61b31133255a0a0b3f72a44c1e5a34d240ebbe425bbded3713a",
+    "catalog_AD6_argilosa.json": "7e5d592df6e0233144a223944078e95df9c2865b537fe05e57e41b279d9f99e0",
+    "climate_daily.json": "48f235ceca6c4e5bc96ee60566b2a6a7a1355542cd51e7545962179f8ef99293",
+    "components_by_content.json": "76aff6f948461ff03d3d63ded05a7b348480f9ec22cc00cf3b66b914024909f9",
+    "components_default.json": "816064cc1cde9e5d865bc8698e966410fdf4e753bd16e53fe93c30a16a7c2924",
+    "eval_intermediates.json": "d6e6be039afd62c5d6229c44bfcbf1a8cb1791ad9ab0d3889da9269169b183ae",
+    "golden_eval_report.json": "bd93d06f53a20ce9aab9adbe5634c14467162aff9569cbabbf4c138fb8308887",
+    "golden_run_result.json": "157728b5ad182c23236456ff031d97a92babf473069d7302fff4ef6fb1540e10",
+    "pareto.json": "5063173eb03b47a7ea46d8173d3d6dd9c383d69b2f8f084f90fe016a5f27ba76",
+    "scenarios.json": "063fe3138c03e3c57659ffac2786a591cc04c8d67ecc9d518bcf5d04ceeef7e3",
+    "selections_15w.json": "6218f78647b63c8ba8bb20b9480146e5bdab792afecb69b90b2532eb42eec793"
+  },
+  "golden": {
+    "eval_report_hash": "504c28e85e54cbd4e9470e8a423499299dcbed643cb9b2ff8aa461873e134c18",
+    "run_result_hash": "b43703326690e6d0ddd2be48641fbdb9ba46908810ebfca0c8c90a379c79fd66"
+  },
+  "plan_counts": {
+    "AD1_argilosa": 169,
+    "AD2_argilosa": 289,
+    "AD3_argilosa": 400,
+    "AD4_arenosa": 576,
+    "AD4_argilosa": 576,
+    "AD4_media": 576,
+    "AD5_argilosa": 729,
+    "AD6_argilosa": 961
+  },
+  "protocol_sha256": "ee8e51c5b2eecc7319818a5645ef15b84d677eabab35caad1a7e9fc41deaefb9",
+  "purpose": "Oráculo de TESTE da migração Rust. Proibido usar como resposta do produto.",
+  "python_sources_equal_baseline": {
+    "src/fieldshift/catalog.py": null,
+    "src/fieldshift/data.py": null,
+    "src/fieldshift/evaluation.py": null,
+    "src/fieldshift/indicators.py": null,
+    "src/fieldshift/optimization.py": null
+  },
+  "python_sources_sha256": {
+    "src/fieldshift/catalog.py": "b077fab2c8645b64023bfab93349de5d72310ec2869f300a94cb09af2113cd53",
+    "src/fieldshift/data.py": "8dd3183283996e33b5c47545f038d17553122df36f1e629e216ac1d4861ac446",
+    "src/fieldshift/evaluation.py": "4fbdc0fbadd6556c6d8b3064a9b0806a43aa6b02c9d3e38f9739ef21485c6bf8",
+    "src/fieldshift/indicators.py": "77d19e7fd513976851eb6b53d99df3d1603debc12a4080641d83e9bd5f45d716",
+    "src/fieldshift/optimization.py": "ed684b2a9e16af49cb5c9a9678be060f433a008042293e5284adf8f6307ab0ed"
+  },
+  "recomputed": {
+    "eval_report_hash": "504c28e85e54cbd4e9470e8a423499299dcbed643cb9b2ff8aa461873e134c18",
+    "run_result_hash": "b43703326690e6d0ddd2be48641fbdb9ba46908810ebfca0c8c90a379c79fd66"
+  },
+  "recomputed_equals_golden": true,
+  "snapshot_id": "power-daily-2.10.3-lat-18_lon-50.625-46c276253b44",
+  "versions": {
+    "numpy": "2.5.4",
+    "pandas": "3.1.1",
+    "python": "3.12.16"
+  }
+}

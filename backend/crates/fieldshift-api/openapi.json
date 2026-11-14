@@ -1,0 +1,1931 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "FieldShift computed scientific API",
+    "version": "1.0.0",
+    "description": "No Python runtime or historical-result replay. Protocol v1.1. Climate data are loaded and hash-verified at startup."
+  },
+  "paths": {
+    "/v1/health": {
+      "get": {
+        "operationId": "health",
+        "summary": "health: verified inputs, real Rust computation",
+        "responses": {
+          "200": {
+            "description": "Computed Rust response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/meta": {
+      "get": {
+        "operationId": "meta",
+        "summary": "meta: verified inputs, real Rust computation",
+        "responses": {
+          "200": {
+            "description": "Computed Rust response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Meta"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/catalog": {
+      "get": {
+        "operationId": "catalog",
+        "summary": "catalog: verified inputs, real Rust computation",
+        "responses": {
+          "200": {
+            "description": "Computed Rust response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Catalog"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/plans": {
+      "post": {
+        "operationId": "plans",
+        "summary": "plans: verified inputs, real Rust computation",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Inputs"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Computed Rust response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plans"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/run": {
+      "post": {
+        "operationId": "run",
+        "summary": "run: verified inputs, real Rust computation",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Inputs"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Computed Rust response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/evaluate": {
+      "post": {
+        "operationId": "evaluate",
+        "summary": "evaluate: verified inputs, real Rust computation",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Inputs"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Computed Rust response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvalReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/provenance": {
+      "get": {
+        "operationId": "provenance",
+        "summary": "provenance: verified inputs, real Rust computation",
+        "responses": {
+          "200": {
+            "description": "Computed Rust response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Provenance"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/limitations": {
+      "get": {
+        "operationId": "limitations",
+        "summary": "limitations: verified inputs, real Rust computation",
+        "responses": {
+          "200": {
+            "description": "Computed Rust response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Limitations"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/pareto": {
+      "post": {
+        "operationId": "pareto",
+        "summary": "pareto: verified inputs, real Rust computation",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Inputs"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Computed Rust response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pareto": {
+                      "$ref": "#/components/schemas/Pareto"
+                    },
+                    "objectives": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "integer"
+                              }
+                            },
+                            {
+                              "type": "number"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "alternatives": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Alternative"
+                      }
+                    }
+                  },
+                  "required": [
+                    "pareto",
+                    "objectives",
+                    "alternatives"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Typed error; no frozen replay or synthetic fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "PlanId": {
+        "type": "array",
+        "items": {
+          "type": "integer"
+        },
+        "minItems": 6,
+        "maxItems": 6
+      },
+      "CurrentPlan": {
+        "type": "object",
+        "properties": {
+          "j1": {
+            "type": "string"
+          },
+          "dec1": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 36
+          },
+          "j2": {
+            "type": "string"
+          },
+          "j3": {
+            "type": "string"
+          },
+          "dec3": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 36
+          },
+          "j4": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "j1",
+          "dec1",
+          "j2",
+          "j3",
+          "dec3",
+          "j4"
+        ]
+      },
+      "Inputs": {
+        "type": "object",
+        "properties": {
+          "ad_class": {
+            "type": "string",
+            "enum": [
+              "AD1",
+              "AD2",
+              "AD3",
+              "AD4",
+              "AD5",
+              "AD6"
+            ]
+          },
+          "texture": {
+            "type": "string",
+            "enum": [
+              "arenosa",
+              "media",
+              "argilosa"
+            ]
+          },
+          "weights": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "p0": {
+            "$ref": "#/components/schemas/CurrentPlan",
+            "nullable": true
+          }
+        },
+        "required": [
+          "ad_class",
+          "texture",
+          "weights"
+        ],
+        "additionalProperties": false
+      },
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "Health": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "recomputation_available": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "status",
+          "language",
+          "mode",
+          "recomputation_available"
+        ]
+      },
+      "Meta": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "protocol_version": {
+            "type": "string"
+          },
+          "snapshot_id": {
+            "type": "string"
+          },
+          "config_hash": {
+            "type": "string"
+          },
+          "protocol_sha256": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "language",
+          "mode",
+          "protocol_version",
+          "snapshot_id",
+          "config_hash",
+          "protocol_sha256"
+        ]
+      },
+      "Crop": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "windows": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cycle_days": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "windows",
+          "cycle_days"
+        ]
+      },
+      "Window": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "crops": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "decendios": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "crops",
+          "decendios"
+        ]
+      },
+      "Catalog": {
+        "type": "object",
+        "properties": {
+          "crops": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Crop"
+            }
+          },
+          "windows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Window"
+            }
+          },
+          "soils": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "textures": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "default_p0": {
+            "$ref": "#/components/schemas/CurrentPlan"
+          },
+          "weight_grid": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "risk_limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "crops",
+          "windows",
+          "soils",
+          "textures",
+          "default_p0",
+          "weight_grid",
+          "risk_limit"
+        ]
+      },
+      "Occupation": {
+        "type": "object",
+        "properties": {
+          "window": {
+            "type": "string"
+          },
+          "crop": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "sow": {
+            "type": "string",
+            "nullable": true
+          },
+          "sow_t": {
+            "type": "integer",
+            "nullable": true
+          },
+          "harvest_t": {
+            "type": "integer",
+            "nullable": true
+          },
+          "zarc_dec": {
+            "type": "integer",
+            "nullable": true
+          }
+        },
+        "required": [
+          "window",
+          "crop",
+          "label",
+          "sow",
+          "sow_t",
+          "harvest_t",
+          "zarc_dec"
+        ]
+      },
+      "Plan": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/PlanId"
+          },
+          "occupations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Occupation"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "occupations"
+        ]
+      },
+      "Policy": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/Plan"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "metrics_construction": {
+            "type": "object",
+            "properties": {
+              "L_sbar": {
+                "type": "number"
+              },
+              "mean_L": {
+                "type": "number"
+              },
+              "max_regret": {
+                "type": "number"
+              },
+              "mean_regret": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "L_sbar",
+              "mean_L",
+              "max_regret",
+              "mean_regret"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "Sensitivity": {
+        "type": "object",
+        "properties": {
+          "weights": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "P1": {
+            "$ref": "#/components/schemas/PlanId"
+          },
+          "P1b": {
+            "$ref": "#/components/schemas/PlanId"
+          },
+          "P2": {
+            "$ref": "#/components/schemas/PlanId"
+          }
+        },
+        "required": [
+          "weights",
+          "P1",
+          "P1b",
+          "P2"
+        ]
+      },
+      "Alternative": {
+        "type": "object",
+        "properties": {
+          "plan_id": {
+            "$ref": "#/components/schemas/PlanId"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "on_front": {
+            "type": "boolean"
+          },
+          "min_hamming_to_others": {
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "hamming_relaxed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "plan_id",
+          "labels",
+          "on_front",
+          "min_hamming_to_others",
+          "reason",
+          "hamming_relaxed"
+        ]
+      },
+      "Pareto": {
+        "type": "object",
+        "properties": {
+          "front_ids": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanId"
+            }
+          },
+          "n_front": {
+            "type": "integer"
+          },
+          "equivalents": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/PlanId"
+              }
+            }
+          },
+          "objectives": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "front_ids",
+          "n_front",
+          "equivalents",
+          "objectives"
+        ]
+      },
+      "RunResult": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "OK",
+              "INVIAVEL",
+              "DADOS_INSUFICIENTES"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "snapshot_id": {
+            "type": "string"
+          },
+          "config_hash": {
+            "type": "string"
+          },
+          "protocol_version": {
+            "type": "string"
+          },
+          "n_plans": {
+            "type": "integer"
+          },
+          "weights": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "policies": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Policy"
+            }
+          },
+          "objectives": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              }
+            }
+          },
+          "pareto": {
+            "$ref": "#/components/schemas/Pareto"
+          },
+          "alternatives": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Alternative"
+            }
+          },
+          "sensitivity": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Sensitivity"
+            }
+          },
+          "result_hash": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "message",
+          "snapshot_id",
+          "config_hash",
+          "protocol_version",
+          "n_plans",
+          "weights",
+          "policies",
+          "objectives",
+          "pareto",
+          "alternatives",
+          "sensitivity",
+          "result_hash"
+        ]
+      },
+      "PolicyMetrics": {
+        "type": "object",
+        "properties": {
+          "policy": {
+            "type": "string"
+          },
+          "plan_id": {
+            "$ref": "#/components/schemas/PlanId",
+            "nullable": true
+          },
+          "feasible": {
+            "type": "boolean"
+          },
+          "M1_max_regret": {
+            "type": "number",
+            "nullable": true
+          },
+          "M2_mean_regret": {
+            "type": "number",
+            "nullable": true
+          },
+          "M2_median_regret": {
+            "type": "number",
+            "nullable": true
+          },
+          "M3_dry_mean_loss": {
+            "type": "number",
+            "nullable": true
+          },
+          "M3_dry_mean_regret": {
+            "type": "number",
+            "nullable": true
+          },
+          "M4a_frac_regret_le_eps": {
+            "type": "number",
+            "nullable": true
+          },
+          "M4b_iqr_loss": {
+            "type": "number",
+            "nullable": true
+          },
+          "M4c_loo_mean_hamming": {
+            "type": "number",
+            "nullable": true
+          },
+          "mean_loss_test": {
+            "type": "number",
+            "nullable": true
+          },
+          "loss_mean_climate": {
+            "type": "number",
+            "nullable": true
+          },
+          "per_scenario_regret": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "per_scenario_loss": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "policy",
+          "plan_id",
+          "feasible",
+          "M1_max_regret",
+          "M2_mean_regret",
+          "M2_median_regret",
+          "M3_dry_mean_loss",
+          "M3_dry_mean_regret",
+          "M4a_frac_regret_le_eps",
+          "M4b_iqr_loss",
+          "M4c_loo_mean_hamming",
+          "mean_loss_test",
+          "loss_mean_climate",
+          "per_scenario_regret",
+          "per_scenario_loss"
+        ]
+      },
+      "Comparison": {
+        "type": "object",
+        "properties": {
+          "a": {
+            "type": "string"
+          },
+          "b": {
+            "type": "string"
+          },
+          "classification": {
+            "type": "string"
+          },
+          "identical_plans": {
+            "type": "boolean"
+          },
+          "n": {
+            "type": "integer"
+          },
+          "wins": {
+            "type": "integer"
+          },
+          "ties": {
+            "type": "integer"
+          },
+          "losses": {
+            "type": "integer"
+          },
+          "median_D": {
+            "type": "number",
+            "nullable": true
+          },
+          "mean_D": {
+            "type": "number",
+            "nullable": true
+          },
+          "ci95_median_D": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "nullable": true
+          },
+          "ci95_mean_D": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "nullable": true
+          },
+          "m1_a": {
+            "type": "number",
+            "nullable": true
+          },
+          "m1_b": {
+            "type": "number",
+            "nullable": true
+          },
+          "wilcoxon_nonoverlap": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "nullable": true
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "a",
+          "b",
+          "classification",
+          "identical_plans",
+          "n",
+          "wins",
+          "ties",
+          "losses",
+          "median_D",
+          "mean_D",
+          "ci95_median_D",
+          "ci95_mean_D",
+          "m1_a",
+          "m1_b",
+          "wilcoxon_nonoverlap",
+          "reason"
+        ]
+      },
+      "EvalReport": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string"
+          },
+          "headline": {
+            "type": "string"
+          },
+          "n_plans": {
+            "type": "integer"
+          },
+          "construction": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "test": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "excluded_scenarios": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {}
+            }
+          },
+          "weights": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "M0_feasibility": {
+            "type": "number",
+            "nullable": true
+          },
+          "M5_price_of_robustness": {
+            "type": "number",
+            "nullable": true
+          },
+          "dry_threshold_mm": {
+            "type": "number",
+            "nullable": true
+          },
+          "dry_test_scenarios": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "policies": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PolicyMetrics"
+            }
+          },
+          "comparisons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Comparison"
+            }
+          },
+          "sensitivity": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {}
+            }
+          },
+          "limitations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "result_hash": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome",
+          "headline",
+          "n_plans",
+          "construction",
+          "test",
+          "excluded_scenarios",
+          "weights",
+          "M0_feasibility",
+          "M5_price_of_robustness",
+          "dry_threshold_mm",
+          "dry_test_scenarios",
+          "policies",
+          "comparisons",
+          "sensitivity",
+          "limitations",
+          "result_hash"
+        ]
+      },
+      "Plans": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "n_plans": {
+            "type": "integer"
+          },
+          "plans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Plan"
+            }
+          },
+          "rejections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {}
+            }
+          },
+          "diagnosis": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "status",
+          "n_plans",
+          "plans",
+          "rejections",
+          "diagnosis"
+        ]
+      },
+      "Provenance": {
+        "type": "object",
+        "properties": {
+          "manifest": {
+            "type": "object",
+            "properties": {
+              "snapshot_id": {
+                "type": "string"
+              },
+              "collected_utc": {
+                "type": "string"
+              },
+              "source": {
+                "type": "object",
+                "properties": {
+                  "api_version": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "api_version"
+                ]
+              },
+              "citation": {
+                "type": "object",
+                "properties": {
+                  "reference": {
+                    "type": "string"
+                  },
+                  "data_reference": {
+                    "type": "string"
+                  },
+                  "referencing_guide": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "reference",
+                  "data_reference",
+                  "referencing_guide"
+                ]
+              },
+              "request": {
+                "type": "object",
+                "additionalProperties": {}
+              },
+              "units": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "snapshot_id",
+              "collected_utc",
+              "source",
+              "citation",
+              "request",
+              "units"
+            ]
+          },
+          "quality": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "protocol_sha256": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "manifest",
+          "quality",
+          "protocol_sha256",
+          "source"
+        ]
+      },
+      "Limitations": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      }
+    }
+  }
+}

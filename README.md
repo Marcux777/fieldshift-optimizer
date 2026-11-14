@@ -34,6 +34,20 @@ Project developed for the [NASA Space Apps Challenge 2026 — Field Shift: Adapt
 
 ---
 
+---
+
+## Rust + SvelteKit 5 Migration (`feat/rust-svelte-migration`)
+
+This branch adds a complete pure-Rust scientific backend (`backend/`, 6-crate Cargo workspace) and a **SvelteKit 5 + TypeScript + Tailwind CSS v4** static frontend (`frontend/`), verified bit-for-bit against the Python baseline (`16cc391318b57fbf44a31c75c994fbb0683b3115`):
+
+- **Rust Backend (`backend/`):** `fieldshift-numeric`, `fieldshift-io`, `fieldshift-model`, `fieldshift-eval`, `fieldshift-cli`, `fieldshift-api` (`176 passed; 0 failed` across unit, ported 1-to-1, integration, and differential suites; `cargo clippy --locked --workspace --all-targets -- -D warnings` clean).
+- **Frontend (`frontend/`):** SvelteKit 5 + TypeScript + Tailwind CSS v4 (`svelte-check` `0 errors, 0 warnings`; Vitest `5 passed`; Playwright E2E `6 passed` on `desktop-chromium` `1280×800` and `mobile-chromium` `390×844`).
+- **Bit-for-Bit Parity Verified:**
+  - Canonical `RunResult` SHA-256: `b43703326690e6d0ddd2be48641fbdb9ba46908810ebfca0c8c90a379c79fd66`
+  - Canonical `EvalReport` SHA-256: `504c28e85e54cbd4e9470e8a423499299dcbed643cb9b2ff8aa461873e134c18`
+  - Primary retrospective outcome (`P2` vs `P1b`): **`NEGATIVO`** (`0.1744` vs `0.1466`, `D = +0.0064`, 95% CI `[-0.0609, +0.0375]`, Wilcoxon `p = 0.6875`)
+- **Documentation:** See [`docs/RUN.md`](docs/RUN.md), [`docs/RUST_MIGRATION.md`](docs/RUST_MIGRATION.md), [`docs/MIGRATION_REPORT.md`](docs/MIGRATION_REPORT.md), [`docs/RUST_CONTRACT.md`](docs/RUST_CONTRACT.md), and [`docs/HOSTING.md`](docs/HOSTING.md).
+
 ## Running Locally with Docker Compose
 
 Development and testing run inside a single reusable container (`fieldshift-dev`) without installing Python dependencies on the host.
