@@ -97,9 +97,10 @@ def inputs_form(cat):
                            p0=catalog.PlanSpec(**selected)), submitted
 
 
-def render_report(rr, report):
+def render_report(rr, report, exploratory=False):
     outcome = OUTCOMES.get(report.outcome, report.outcome)
-    st.header(f"Outcome: {outcome}")
+    label = "Exploratory outcome" if exploratory else "Outcome"
+    st.header(f"{label}: {outcome}")
     st.caption("Primary retrospective comparison: P2 vs P1b. All outcomes use the same format.")
     if rr.status != "OK":
         if rr.status == "INVIAVEL":
@@ -260,6 +261,9 @@ def main():
     st.set_page_config(page_title="FieldShift Optimizer", page_icon="🌱", layout="wide")
     st.title("FieldShift Optimizer")
     st.info(DISCLAIMER)
+    st.info("Frozen evaluation outcome: NEGATIVE — under the default AD4/clay inputs, "
+            "minimax regret did not reduce maximum test regret versus expected loss. "
+            "Changed-input runs are exploratory and do not replace this finding.")
     st.caption("Rio Verde, Goiás · Rainfed farming · Two agricultural years · Four crop windows")
     try:
         cat = catalog.load_catalog(pipeline.ROOT / "config")
@@ -278,14 +282,15 @@ def main():
         used, (rr, report) = st.session_state.result
         if used != inputs:
             st.warning("Inputs changed. Submit again to update results.")
-        if (used.ad_class != "AD4" or used.texture != "argilosa"
-                or used.weights != (0.5, 0.25, 0.25)
-                or used.p0 != catalog.default_p0_spec(cat)):
+        exploratory = (used.ad_class != "AD4" or used.texture != "argilosa"
+                       or used.weights != (0.5, 0.25, 0.25)
+                       or used.p0 != catalog.default_p0_spec(cat))
+        if exploratory:
             st.warning("EXPLORATORY RUN: changed soil, weights or current plan. "
                        "This result does not replace the frozen AD4/clay evaluation, "
                        "whose primary outcome was NEGATIVE.")
         st.caption(f"Snapshot: {rr.snapshot_id} · Configuration: {rr.config_hash}")
-        render_report(rr, report)
+        render_report(rr, report, exploratory=exploratory)
     else:
         st.write("Choose the farm inputs and compare rotations. No recommendation has been run.")
     with st.tabs(["Sources, assumptions, uncertainties and limitations"])[0]:

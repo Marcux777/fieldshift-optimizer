@@ -12,6 +12,8 @@ def app():
 
 def test_invalid_input_and_clear_old_result(monkeypatch):
     at = app()
+    assert any("Frozen evaluation outcome: NEGATIVE" in msg.value for msg in at.info)
+    assert not at.header
     at.number_input[0].set_value(0.9)
     at.button[0].click().run()
     assert not at.exception
@@ -61,3 +63,5 @@ def test_ad1_p0_diagnosis_does_not_invalidate_feasible_alternatives():
     assert any("INVIAVEL_SOB_ZARC" in x.value for x in at.warning)
     assert any("30% exceeds 20%" in x.value for x in at.markdown)
     assert any("EXPLORATORY RUN" in x.value for x in at.warning)
+    assert any(h.value.startswith("Exploratory outcome:") for h in at.header)
+    assert not any(h.value.startswith("Outcome:") for h in at.header)
