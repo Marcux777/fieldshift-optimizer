@@ -1,6 +1,7 @@
 # AI-assisted (OpenBot agent)
 """English Streamlit interface; domain rules are delegated to pipeline/core."""
 import json
+import re
 from dataclasses import asdict
 
 import pandas as pd
@@ -29,6 +30,28 @@ DISCLAIMER = (
 
 def crop_name(key):
     return CROPS.get(key, key.replace("_", " ").title())
+
+
+def date_label(t):
+    month, day = catalog.t_to_md(t)
+    months = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct",
+              "Nov", "Dec")
+    suffix = " (year 2)" if t >= 365 else ""
+    return f"{day}/{months[month - 1]}{suffix}"
+
+
+def p0_diagnostics(entry):
+    for reason in entry.get("reasons", []):
+        window = reason.split(":", 1)[0]
+        risk = re.search(r"risco (\d+)% > (\d+)%", reason)
+        if risk:
+            st.write(f"{window}: ZARC risk {risk[1]}% exceeds {risk[2]}% for the selected "
+                     "crop and sowing period in this soil class.")
+        elif "pousio não permitido" in reason:
+            st.write(f"{window}: fallow is not allowed while a feasible second crop exists.")
+        else:
+            st.write(f"{window}: the selected crop or sowing period violates the calendar, "
+                     "succession or fixed ZARC constraints. Change P0 explicitly to compare it.")
 
 
 def inputs_form(cat):
@@ -60,7 +83,7 @@ def inputs_form(cat):
                 f"Year {year}: sowing ten-day period",
                 cat.windows[first.upper()].decendios,
                 index=cat.windows[first.upper()].decendios.index(getattr(default, dec_key)),
-                format_func=lambda d: f"{d}: {catalog.t_label(catalog.dec_start_t(d))}")
+                format_func=lambda d: f"{d}: {date_label(catalog.dec_start_t(d))}")
             options = (*cat.windows[second.upper()].crops, "pousio")
             selected[second] = cols[2].selectbox(
                 f"Year {year}: second crop", options,
@@ -101,12 +124,18 @@ def render_report(rr, report):
             entry = rr.policies[key]
             with st.expander(f"{key}: {label}", expanded=key == "P2"):
                 if entry["status"] != "OK":
-                    st.warning("Infeasible under ZARC 20% / calendar rules; excluded from regret.")
+                    st.warning("INFEASIBLE (INVIAVEL_SOB_ZARC): P0 violates ZARC 20% / "
+                               "calendar rules and is excluded from regret. "
+                               "Feasible alternatives remain available.")
+                    p0_diagnostics(entry)
                     continue
                 plan = entry["plan"]
                 st.dataframe(pd.DataFrame([
                     {"Window": o["window"], "Crop": crop_name(o["crop"]),
-                     "Sowing (day/month)": o["sow"], "Harvest day index": o["harvest_t"]}
+                     "Sowing (day/month)": date_label(o["sow_t"])
+                     if o["sow_t"] is not None else "—",
+                     "Harvest (day/month)": date_label(o["harvest_t"])
+                     if o["harvest_t"] is not None else "—"}
                     for o in plan["occupations"]]), hide_index=True)
                 m = entry["metrics_construction"]
                 st.write(f"Construction mean loss: {m['mean_L']:.4f}; "
@@ -122,31 +151,38 @@ def render_report(rr, report):
                 st.write(f"Selection changes at {len(changed)} of 15 fixed weight settings. "
                          "Soil and calendar constraints can also change feasibility.")
                 if changed:
-                    st.write("Weight settings selecting a different plan:", changed)
+                    st.write("Weight settings selecting a different plan:")
+                    st.dataframe(pd.DataFrame(changed, columns=["Exposure", "Coverage",
+                                                               "Diversity"]), hide_index=True)
     with tabs[1]:
-        st.caption("Construction-only Pareto front: mean and worst climate exposure, "
-                   "coverage loss and diversity loss. Lower is better; color shows worst exposure.")
+        st.caption("2D projection of the construction-only four-dimensional Pareto front. "
+                   "Axes show mean exposure and coverage loss; color shows diversity loss; "
+                   "hover shows worst exposure. Lower is better. Dominance uses all four values.")
         frame = pd.DataFrame(rr.objectives, columns=["Plan", "Mean exposure", "Worst exposure",
                                                      "Coverage loss", "Diversity loss"])
         front_ids = {tuple(x) for x in rr.pareto["front_ids"]}
         front = frame[frame["Plan"].map(lambda x: tuple(x) in front_ids)].copy()
         front["Plan"] = front["Plan"].astype(str)
-        fig = px.scatter_3d(front, x="Mean exposure", y="Coverage loss", z="Diversity loss",
-                            color="Worst exposure", hover_name="Plan")
+        fig = px.scatter(front, x="Mean exposure", y="Coverage loss", color="Diversity loss",
+                         hover_name="Plan", hover_data=["Worst exposure"], render_mode="svg")
+        fig.update_traces(marker={"size": 11, "line": {"width": 1, "color": "#245840"}})
         st.plotly_chart(fig, width="stretch")
         st.write(f"{rr.pareto['n_front']} non-dominated objective vectors. "
                  "Equal vectors are represented once; distinct rotations are listed below.")
         by_id = {tuple(row[0]): row[1:] for row in rr.objectives}
         cat = catalog.load_catalog(pipeline.ROOT / "config")
+        alternatives = []
         for alternative in rr.alternatives:
             pid = alternative["plan_id"]
             sequence = [crop_name(cat.crops[pid[i]].key) for i in (0, 2, 3, 5)]
-            st.write({"Plan": alternative["plan_id"], "Policies": alternative["labels"],
+            alternatives.append({"Plan": str(alternative["plan_id"]),
+                      "Policies": ", ".join(alternative["labels"]),
                       "Crop sequence J1–J4": " → ".join(sequence),
                       "On front": alternative["on_front"],
                       "Mean/worst exposure, coverage/diversity loss":
                           by_id[tuple(alternative["plan_id"])],
                       "Minimum crop-window differences": alternative["min_hamming_to_others"]})
+        st.dataframe(pd.DataFrame(alternatives), hide_index=True)
     with tabs[2]:
         st.write("Construction: 1981/82–2009/10. Test: 2010/11–2024/25. "
                  "No scenario pair crosses the split; 29 February is discarded.")
@@ -242,6 +278,12 @@ def main():
         used, (rr, report) = st.session_state.result
         if used != inputs:
             st.warning("Inputs changed. Submit again to update results.")
+        if (used.ad_class != "AD4" or used.texture != "argilosa"
+                or used.weights != (0.5, 0.25, 0.25)
+                or used.p0 != catalog.default_p0_spec(cat)):
+            st.warning("EXPLORATORY RUN: changed soil, weights or current plan. "
+                       "This result does not replace the frozen AD4/clay evaluation, "
+                       "whose primary outcome was NEGATIVE.")
         st.caption(f"Snapshot: {rr.snapshot_id} · Configuration: {rr.config_hash}")
         render_report(rr, report)
     else:
