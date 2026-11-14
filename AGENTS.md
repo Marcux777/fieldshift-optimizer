@@ -34,7 +34,7 @@ FieldShift Optimizer: app web (Streamlit) de apoio à decisão para rotação de
 
 ## Comandos
 
-Escopo técnico congelado em `docs/DECISIONS.md`; leia antes de qualquer mudança. Instalação, testes, lint e app rodam em container Docker do projeto (Python 3.12 e uv na imagem), sem ambiente Python no host, a pedido do usuário em 13/11. O deploy não usa Docker: é direto no Streamlit Community Cloud, então o repositório traz a lista de dependências e o snapshot. Antes do primeiro comando ou arquivo Docker, ler `~/.codex/instructions/docker.md`. Dockerfile, Compose e dependências entram a partir de 14/11 às 9h.
+Escopo técnico congelado em `docs/DECISIONS.md`; leia antes de qualquer mudança. Instalação, testes, lint e app rodam em container Docker do projeto (Python 3.12 e uv na imagem), sem ambiente Python no host, a pedido do usuário em 13/11. O deploy não usa Docker: é direto no Streamlit Community Cloud, então o repositório traz a lista de dependências e o snapshot. Antes do primeiro comando ou arquivo Docker, ler `~/.codex/instructions/docker.md`. Ambiente e comandos: `docs/CONTRACT.md` (contêiner `fieldshift-dev`, `docker compose exec -T dev <cmd>`). Divisão de arquivos entre agentes: `docs/CONTRACT.md`.
 
 ## Regras do projeto
 

@@ -1,0 +1,18 @@
+# Ambiente de desenvolvimento e teste (reutilizável): docker compose up -d dev; docker compose exec dev <cmd>
+# O deploy NÃO usa Docker: Streamlit Community Cloud instala a partir do repositório.
+name: fieldshift
+x-shared-cache-uv: &shared-cache-uv ${DOCKER_SHARED_CACHE_ROOT:-${HOME}/.cache/docker-shared}/uv:/home/app/.cache/uv:z
+services:
+  dev:
+    build: .
+    image: fieldshift:dev
+    container_name: fieldshift-dev
+    command: sleep infinity
+    working_dir: /app
+    volumes:
+      - .:/app:z
+      - *shared-cache-uv
+    environment:
+      UV_PROJECT_ENVIRONMENT: /opt/venv
+    ports:
+      - "127.0.0.1:8501:8501"

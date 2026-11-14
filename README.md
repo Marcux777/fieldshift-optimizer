@@ -27,4 +27,4 @@ Apoio à decisão, que não substitui o agricultor nem a assistência agronômic
 
 ## Licença
 
-A definir antes de publicar o repositório.
+MIT para o código (`LICENSE`).

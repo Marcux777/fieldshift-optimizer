@@ -1,13 +1,31 @@
 [project]
 name = "fieldshift-optimizer"
-version = "0.0.0"
-description = "Apoio à decisão para rotação de culturas sob incerteza climática (NASA Space Apps 2026, desafio Field Shift)."
+version = "0.1.0"
+description = "Decision support for crop rotation under climate uncertainty (NASA Space Apps 2026, Field Shift challenge)."
+readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.12"
-# Dependências são definidas a partir de 14/11 às 9h, após congelar a formulação e a interface.
-dependencies = []
+dependencies = [
+    "numpy>=2.0",
+    "pandas>=2.2",
+    "pyarrow>=17",
+    "streamlit>=1.40",
+    "plotly>=5.24",
+]
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fieldshift"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
 
 [tool.ruff]
 target-version = "py312"
