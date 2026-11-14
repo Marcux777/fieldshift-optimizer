@@ -1,0 +1,30 @@
+{
+  "run_id": "20261114T184243Z",
+  "started_utc": "2026-11-14T18:42:43Z",
+  "finished_utc": "2026-11-14T18:42:44Z",
+  "seconds": {
+    "optimization": 0.36,
+    "evaluation": 0.74,
+    "total": 1.4
+  },
+  "outcome": "NEGATIVO",
+  "eval_result_hash": "504c28e85e54cbd4e9470e8a423499299dcbed643cb9b2ff8aa461873e134c18",
+  "run_result_hash": "b43703326690e6d0ddd2be48641fbdb9ba46908810ebfca0c8c90a379c79fd66",
+  "frozen_config_sha256": "067e569ec333fc7b7dcff85d925732f3746bf2f6525fd7f4d38e6935f64cbad1",
+  "frozen_config_matches": true,
+  "snapshot_id": "power-daily-2.10.3-lat-18_lon-50.625-46c276253b44",
+  "snapshot_manifest_sha256": "2de4764ad0c1a25f85d3989488d175236171db89505705c8c9f3f69f50f2d76b",
+  "protocol_file_sha256": "ee8e51c5b2eecc7319818a5645ef15b84d677eabab35caad1a7e9fc41deaefb9",
+  "git": {
+    "commit": "40bad6dab04fd1b576d2b9f91039525f6e734f08",
+    "dirty": null
+  },
+  "uv_lock_sha256": "769c4055e57361c607df8d675c3725c243d29e5153757422d34fe28a5db1f002",
+  "versions": {
+    "python": "3.12.16",
+    "numpy": "2.5.4",
+    "pandas": "3.1.1"
+  },
+  "seed": 20261114,
+  "n_boot": 10000
+}

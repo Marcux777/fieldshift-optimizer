@@ -349,3 +349,53 @@ def test_audit_flags_optimizer_choice_that_breaks_protocol(climate):
 
 def test_two_runs_same_result_hash(climate):
     assert _evaluate(climate).result_hash() == _evaluate(climate).result_hash()
+
+
+# --- Regressões da revisão VSDD -----------------------------------------------------
+
+
+def test_M2_missing_T2M_excludes_scenario_like_the_other_variables(climate):
+    c = climate.copy()
+    c.loc["1990-01-15", "T2M"] = -999.0  # só T2M ausente, no ano agrícola 1989/90
+    s = ev.split_scenarios(c, ev.EvalProtocol())
+    labels = [x.label for x in s.construction]
+    assert "1988/89–1989/90" not in labels and "1989/90–1990/91" not in labels
+    assert len(s.construction) == 26
+
+
+def test_M1_pair_cache_never_returns_climate_of_another_scenario():
+    from test_leakage import ROOT
+
+    from fieldshift import catalog as cat
+    from fieldshift import indicators
+
+    config = ROOT / "config"
+    catalog = cat.load_catalog(config)
+    soil = cat.load_soil(config)
+    params = indicators.load_indicator_params(config, catalog)
+    plans, _ = cat.enumerate_plans(catalog, soil, 0.20)
+    plan = plans[0]
+    rng = np.random.default_rng(3)
+    model = ev.IndicatorLossModel(params)
+    fresh_ref = None
+    for k in range(60):
+        # mesmo rótulo e mesmo start (como o s̄ do leave-one-out), conteúdo diferente;
+        # o objeto anterior é descartado, então id() pode ser reaproveitado.
+        p = rng.gamma(0.6, 12.0, 730)
+        sc = ev.Scenario(
+            start=-1,
+            label="clima_medio_construcao",
+            precip=p,
+            tmax=np.full(730, 30.0),
+            tmin=np.full(730, 19.0),
+            first_date="",
+            last_date="",
+            years=(k,),
+            synthetic=True,
+        )
+        if fresh_ref is None:
+            fresh_ref = model.fit([sc])
+        got = model.components(plan, sc, fresh_ref)
+        want = ev.IndicatorLossModel(params).components(plan, sc, fresh_ref)
+        assert got == want, f"iteração {k}: cache devolveu o clima de outro cenário"
+        del sc

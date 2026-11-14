@@ -29,7 +29,9 @@ import pandas as pd
 PROTOCOL_VERSION = "1.1"
 PROTOCOL_SHA256 = "ee8e51c5b2eecc7319818a5645ef15b84d677eabab35caad1a7e9fc41deaefb9"
 
-CLIMATE_VARS = ("PRECTOTCORR", "T2M_MAX", "T2M_MIN")
+CLIMATE_VARS = ("PRECTOTCORR", "T2M_MAX", "T2M_MIN")  # séries usadas nos indicadores
+# Validade do cenário (protocolo v1.1 §1.3): as quatro variáveis completas, como no otimizador.
+VALIDITY_VARS = ("PRECTOTCORR", "T2M", "T2M_MAX", "T2M_MIN")
 DAYS_PER_YEAR = 365
 HORIZON_DAYS = 730
 
@@ -133,7 +135,7 @@ def _agri_year(climate: pd.DataFrame, y: int) -> AgriYear:
     full = pd.date_range(start, end, freq="D")
     full = full[~((full.month == 2) & (full.day == 29))]
     sub = climate.reindex(full)  # dias faltando no índice viram NaN (ausente, nunca 0)
-    arrays = {v: sub[v].to_numpy(dtype=float) for v in CLIMATE_VARS}
+    arrays = {v: sub[v].to_numpy(dtype=float) for v in VALIDITY_VARS}
     missing = {v: int(np.isnan(a).sum()) for v, a in arrays.items()}
     return AgriYear(
         start=y,
@@ -147,10 +149,10 @@ def _agri_year(climate: pd.DataFrame, y: int) -> AgriYear:
 
 def build_agri_years(climate: pd.DataFrame, first: int, last: int) -> dict[int, AgriYear]:
     """Anos agrícolas de ``first`` a ``last`` (inclusive). -999 vira ausente antes de tudo."""
-    missing_cols = [v for v in CLIMATE_VARS if v not in climate.columns]
+    missing_cols = [v for v in VALIDITY_VARS if v not in climate.columns]
     if missing_cols:
         raise EvaluationError(f"clima sem colunas obrigatórias: {missing_cols}")
-    clim = climate[list(CLIMATE_VARS)].astype(float).replace(-999.0, np.nan)
+    clim = climate[list(VALIDITY_VARS)].astype(float).replace(-999.0, np.nan)
     clim.index = pd.DatetimeIndex(clim.index)
     if clim.index.has_duplicates:
         raise EvaluationError("clima com datas duplicadas")
@@ -1088,7 +1090,7 @@ class IndicatorLossModel:
 
     def __init__(self, base_params: Any) -> None:
         self.base_params = base_params
-        self._pairs: dict[str, Any] = {}
+        self._pairs: dict[int, tuple[Scenario, Any]] = {}
         self.fit_labels: tuple[str, ...] = ()
 
     def fit(self, construction: Sequence[Scenario]) -> Any:
@@ -1109,12 +1111,14 @@ class IndicatorLossModel:
     def components(self, plan: Any, scenario: Scenario, params: Any) -> tuple[float, float, float]:
         from fieldshift.indicators import ClimatePair, loss_components
 
-        key = f"{scenario.label}|{scenario.start}|{id(scenario)}"
-        pair = self._pairs.get(key)
-        if pair is None:
+        # VSDD M-1: o cache guarda o PRÓPRIO cenário junto do par. Enquanto está no cache o objeto
+        # continua vivo, então seu id() não pode ser reaproveitado; a identidade é conferida.
+        entry = self._pairs.get(id(scenario))
+        if entry is None or entry[0] is not scenario:
             pair = ClimatePair(scenario.precip, scenario.tmax, scenario.tmin, scenario.label)
-            self._pairs[key] = pair
-        return loss_components(plan, pair, params)
+            entry = (scenario, pair)
+            self._pairs[id(scenario)] = entry
+        return loss_components(plan, entry[1], params)
 
 
 def sbar_sha256_like_optimizer(climate: pd.DataFrame, protocol: EvalProtocol | None = None) -> str:
