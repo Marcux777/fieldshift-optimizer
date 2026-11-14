@@ -1,17 +1,32 @@
-[package]
-name = "fieldshift-api"
-version = "0.1.0"
+[workspace]
+resolver = "2"
+members = [
+  "crates/fieldshift-numeric",
+  "crates/fieldshift-io",
+  "crates/fieldshift-model",
+  "crates/fieldshift-eval",
+  "crates/fieldshift-cli",
+  "crates/fieldshift-api",
+]
+
+[workspace.package]
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
-description = "Rust API for the FieldShift migration; serves frozen, verified evidence"
+rust-version = "1.80"
 
-[dependencies]
+[workspace.dependencies]
 anyhow = "1"
-axum = "0.8"
+thiserror = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
-tokio = { version = "1", features = ["full"] }
-tower-http = { version = "0.6", features = ["cors", "trace"] }
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+toml = "0.8"
+csv = "1"
+flate2 = "1"
+clap = { version = "4", features = ["derive"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }

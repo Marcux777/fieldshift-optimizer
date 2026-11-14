@@ -46,3 +46,4 @@ secrets/
 data/raw/
 data/cache/
 reports/generated/
+/backend/target/

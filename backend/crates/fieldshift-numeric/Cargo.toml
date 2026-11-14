@@ -1,0 +1,13 @@
+[package]
+name = "fieldshift-numeric"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true

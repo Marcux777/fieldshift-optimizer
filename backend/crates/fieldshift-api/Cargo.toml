@@ -1,0 +1,17 @@
+[package]
+name = "fieldshift-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+fieldshift-numeric = { path = "../fieldshift-numeric" }
+fieldshift-io = { path = "../fieldshift-io" }
+fieldshift-model = { path = "../fieldshift-model" }
+fieldshift-eval = { path = "../fieldshift-eval" }
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
