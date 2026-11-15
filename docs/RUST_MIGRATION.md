@@ -30,5 +30,5 @@ This branch implements the full migration of **FieldShift Optimizer** from Pytho
 
 ## Remaining Gated Stages (Require Explicit User Authorization)
 
-- **E10 (Public Deployment):** Single-container `backend/Dockerfile` (`fieldshift:rust-migration`) and free hosting analysis (`docs/HOSTING.md`) are ready and locally smoke-tested (`--read-only`, `uid=65534`, no Python). Public deployment awaits explicit user authorization.
+- **E10 (Public Deployment):** Done on 2026-11-14 with user authorization: Render Free web service at https://fieldshift-optimizer.onrender.com built from the single-container `backend/Dockerfile` (no Python), auto-deploy off. Acceptance checks reported at deployment: `/v1/health` 200; `/v1/run` and `/v1/evaluate` computed live with the reference hashes; UI on desktop and mobile; two concurrent sessions; recovery after a manual restart. A real idle sleep (cold start after ~15 min) was not measured at that time. Hosting notes: `docs/HOSTING.md`.
 - **E11 (Legacy Python/Streamlit Removal):** Python source (`src/fieldshift/`), `app.py`, and `uv.lock` remain intact until a separate user-authorized cleanup PR after final review.

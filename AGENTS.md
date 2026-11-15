@@ -2,7 +2,7 @@
 
 Fonte comum de instruções do projeto para Codex, Claude e outros agentes. `CLAUDE.md` a importa com `@AGENTS.md`; não mantenha cópias divergentes. Continuam aplicáveis as instruções globais do ambiente e a autorização do usuário.
 
-FieldShift Optimizer: app web (Streamlit) de apoio à decisão para rotação de culturas sob incerteza climática, para o desafio "Field Shift: Adapting Farms with NASA Data" do NASA Space Apps 2026. Rio Verde (GO), sequeiro, 2 anos agrícolas, 4 janelas de cultivo, dados NASA em snapshot versionado. Compara plano atual, otimização convencional (clima médio) e minimax regret, com avaliação retrospectiva sem vazamento.
+FieldShift Optimizer: app web de apoio à decisão (API Rust + frontend SvelteKit, publicado no Render Free; o app Streamlit original fica no repositório só como implementação de referência dos testes diferenciais) para rotação de culturas sob incerteza climática, para o desafio "Field Shift: Adapting Farms with NASA Data" do NASA Space Apps 2026. Rio Verde (GO), sequeiro, 2 anos agrícolas, 4 janelas de cultivo, dados NASA em snapshot versionado. Compara plano atual, otimização convencional (clima médio) e minimax regret, com avaliação retrospectiva sem vazamento.
 
 ## Retomada do trabalho
 
@@ -34,7 +34,7 @@ FieldShift Optimizer: app web (Streamlit) de apoio à decisão para rotação de
 
 ## Comandos
 
-Escopo técnico congelado em `docs/DECISIONS.md`; leia antes de qualquer mudança. Instalação, testes, lint e app rodam em container Docker do projeto (Python 3.12 e uv na imagem), sem ambiente Python no host, a pedido do usuário em 13/11. O deploy não usa Docker: é direto no Streamlit Community Cloud, então o repositório traz a lista de dependências e o snapshot. Antes do primeiro comando ou arquivo Docker, ler `~/.codex/instructions/docker.md`. Ambiente e comandos: `docs/CONTRACT.md` (contêiner `fieldshift-dev`, `docker compose exec -T dev <cmd>`). Divisão de arquivos entre agentes: `docs/CONTRACT.md`.
+Escopo técnico congelado em `docs/DECISIONS.md`; leia antes de qualquer mudança. A implementação Python de referência (instalação, testes, lint e app Streamlit) roda em container Docker do projeto (Python 3.12 e uv na imagem), sem ambiente Python no host, a pedido do usuário em 13/11. O app publicado é o Rust + SvelteKit: um contêiner único (`backend/Dockerfile`) no Render Free; Rust e Node rodam no host, com o toolchain fixado em `rust-toolchain.toml` (`docs/RUN.md`, `docs/HOSTING.md`). Antes do primeiro comando ou arquivo Docker, ler `~/.codex/instructions/docker.md`. Ambiente e comandos: `docs/CONTRACT.md` (contêiner `fieldshift-dev`, `docker compose exec -T dev <cmd>`). Divisão de arquivos entre agentes: `docs/CONTRACT.md`.
 
 ## Regras do projeto
 

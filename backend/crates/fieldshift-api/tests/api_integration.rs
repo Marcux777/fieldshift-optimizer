@@ -713,3 +713,90 @@ async fn bounded_queue_wait_returns_503_with_retry_after() {
         "requests that cannot start within queue_wait must get 503"
     );
 }
+
+/// Item D: cache and security headers on API, SPA HTML and content-hashed bundles.
+#[tokio::test]
+async fn cache_control_and_security_headers() {
+    use fieldshift_api::{
+        API_CACHE_CONTROL, CONTENT_SECURITY_POLICY, IMMUTABLE_CACHE_CONTROL, STATIC_CACHE_CONTROL,
+    };
+
+    let dir = std::env::temp_dir().join(format!("fs-api-headers-{}", std::process::id()));
+    std::fs::create_dir_all(dir.join("_app/immutable/entry")).expect("mkdir");
+    std::fs::write(dir.join("index.html"), "<html>index</html>").expect("index");
+    std::fs::write(dir.join("200.html"), "<html>spa</html>").expect("spa");
+    std::fs::write(dir.join("_app/immutable/entry/app.abc123.js"), "export{}").expect("js");
+
+    let engine = Engine::load(&repo_root()).expect("engine loads");
+    let app = router(engine, Some(dir.clone()), Vec::new());
+
+    async fn head(app: &Router, uri: &str) -> (StatusCode, axum::http::HeaderMap) {
+        let req = Request::builder()
+            .method(Method::GET)
+            .uri(uri)
+            .body(Body::empty())
+            .expect("request");
+        let resp = app.clone().oneshot(req).await.expect("response");
+        (resp.status(), resp.headers().clone())
+    }
+    let get = |h: &axum::http::HeaderMap, name: &str| {
+        h.get(name)
+            .map(|v| v.to_str().expect("ascii").to_string())
+            .unwrap_or_default()
+    };
+
+    for (uri, expected_status, cache) in [
+        ("/v1/health", StatusCode::OK, API_CACHE_CONTROL),
+        ("/health", StatusCode::OK, API_CACHE_CONTROL),
+        ("/v1/meta", StatusCode::OK, API_CACHE_CONTROL),
+        ("/v1/unknown", StatusCode::NOT_FOUND, API_CACHE_CONTROL),
+        ("/", StatusCode::OK, STATIC_CACHE_CONTROL),
+        // Existing behaviour: unknown paths get the SPA shell (200.html) with status 404.
+        (
+            "/some/client/route",
+            StatusCode::NOT_FOUND,
+            STATIC_CACHE_CONTROL,
+        ),
+        (
+            "/_app/immutable/entry/app.abc123.js",
+            StatusCode::OK,
+            IMMUTABLE_CACHE_CONTROL,
+        ),
+    ] {
+        let (status, h) = head(&app, uri).await;
+        assert_eq!(status, expected_status, "{uri}");
+        assert_eq!(get(&h, "cache-control"), cache, "{uri}");
+        assert_eq!(get(&h, "x-content-type-options"), "nosniff", "{uri}");
+        assert_eq!(get(&h, "x-frame-options"), "DENY", "{uri}");
+        assert_eq!(
+            get(&h, "referrer-policy"),
+            "strict-origin-when-cross-origin",
+            "{uri}"
+        );
+        assert_eq!(
+            get(&h, "content-security-policy"),
+            CONTENT_SECURITY_POLICY,
+            "{uri}"
+        );
+        assert!(
+            get(&h, "permissions-policy").contains("geolocation=()"),
+            "{uri}"
+        );
+    }
+
+    // POST results are not cacheable either.
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/v1/run")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(r#"{"ad_class":"AD9"}"#))
+        .expect("request");
+    let resp = app.clone().oneshot(req).await.expect("response");
+    assert_eq!(
+        resp.headers()
+            .get("cache-control")
+            .and_then(|v| v.to_str().ok()),
+        Some(API_CACHE_CONTROL)
+    );
+    let _ = std::fs::remove_dir_all(dir);
+}

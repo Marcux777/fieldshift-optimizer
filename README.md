@@ -10,7 +10,8 @@ Project developed for the [NASA Space Apps Challenge 2026 — Field Shift: Adapt
 
 ## Status & Key Outcome
 
-- **Test Suite & Linter (verified in container `fieldshift-dev`):** `170 passed in 17.53s` (`pytest -q`); `ruff check .` passed (`All checks passed!`).
+- **Live app:** https://fieldshift-optimizer.onrender.com (Rust API + SvelteKit, Render Free; the free instance sleeps after 15 minutes without traffic, so the first request can take about a minute).
+- **Python reference implementation (oracle for differential tests, verified in container `fieldshift-dev`):** `170 passed in 17.53s` (`pytest -q`); `ruff check .` passed (`All checks passed!`).
 - **Retrospective Evaluation Outcome (`2010/11–2024/25` held-out test):** **NEGATIVE.** On the frozen protocol (`v1.1`, `|X| = 576` feasible plans, weights `0.50 / 0.25 / 0.25`), minimax regret (`P2`) did **not** outperform expected-loss (`P1b`) or average-climate optimization (`P1`):
   - **`P2` vs. `P1b` (primary):** **NEGATIVE** — test max regret `0.1744` (`P2`) vs. `0.1466` (`P1b`), median paired difference `D = +0.0064`, 95% CI `[-0.0609, +0.0375]`, Wilcoxon `p = 0.6875` (`7` non-overlapping pairs).
   - **`P2` vs. `P1` (secondary):** **NEGATIVE** — `P2` lowers test max regret (`0.1744` vs. `0.2811`) but performs worse in most test years (`2` wins, `4` ties, `8` losses; median `D = +0.0228`, 95% CI `[+0.0112, +0.0549]`). Using the **mean** CI (`[-0.0234, +0.0466]`) instead of the median would classify this comparison as **INCONCLUSIVE**.
@@ -18,7 +19,7 @@ Project developed for the [NASA Space Apps Challenge 2026 — Field Shift: Adapt
   - **15-weight sensitivity grid (`P2` vs. `P1b`):** **NEGATIVE** in `8` points and **INCONCLUSIVE** in `7` points (`0` sustained).
 - **What the App Delivers:** Rather than claiming minimax regret "wins," FieldShift Optimizer provides a transparent, reproducible tool to **compare** rotation strategies side by side, **explore** the Pareto frontier (`36` distinct non-dominated objective vectors; `50` plans including `14` vector ties; `6` distinct crop-signature alternatives), inspect the price of robustness in average climate (`M5 = 0.0080`), and see honestly when robustness did **not** pay off out-of-sample.
 - **Public Repository:** https://github.com/Marcux777/fieldshift-optimizer (public, MIT)
-- **Live Deployment URL:** `[RESULT PENDING]`
+- **Live Deployment URL:** https://fieldshift-optimizer.onrender.com
 
 ---
 
@@ -30,7 +31,7 @@ Project developed for the [NASA Space Apps Challenge 2026 — Field Shift: Adapt
 - **Multi-Objective Optimization & Pareto Frontier:** Three objectives in `[0, 1]` (climate exposure `g1`, vegetation cover discontinuity `g2`, crop diversity deficit `g3`), default weights `0.50 / 0.25 / 0.25` plus a 15-point sensitivity grid.
 - **Policy Comparison:** Side-by-side comparison of `P0` (current plan), `P1` (average-climate optimization), `P1b` (expected-loss optimization), and `P2` (minimax regret).
 - **Retrospective Evaluation:** Strict temporal split (`1981/82–2009/10` construction, 28 two-year pairs; `2010/11–2024/25` held-out test, 14 two-year pairs) with independent loss recomputation and leakage checks.
-- **Interface:** Streamlit web application displaying sources, assumptions, trade-offs, and limitations.
+- **Interface:** SvelteKit 5 static web app served by the Rust API (`fieldshift-api`), showing sources, assumptions, trade-offs, and limitations. The original Streamlit app (`app.py`) stays in the repository only as the reference implementation.
 
 ---
 
@@ -48,9 +49,19 @@ This branch adds a complete pure-Rust scientific backend (`backend/`, 6-crate Ca
   - Primary retrospective outcome (`P2` vs `P1b`): **`NEGATIVO`** (`0.1744` vs `0.1466`, `D = +0.0064`, 95% CI `[-0.0609, +0.0375]`, Wilcoxon `p = 0.6875`)
 - **Documentation:** See [`docs/RUN.md`](docs/RUN.md), [`docs/RUST_MIGRATION.md`](docs/RUST_MIGRATION.md), [`docs/MIGRATION_REPORT.md`](docs/MIGRATION_REPORT.md), [`docs/RUST_CONTRACT.md`](docs/RUST_CONTRACT.md), and [`docs/HOSTING.md`](docs/HOSTING.md).
 
-## Running Locally with Docker Compose
+## Running Locally
 
-Development and testing run inside a single reusable container (`fieldshift-dev`) without installing Python dependencies on the host.
+**Rust + SvelteKit app (what is deployed):** see [`docs/RUN.md`](docs/RUN.md) for the full commands (backend tests, offline CLI reproduction, frontend checks and Playwright, single-container Docker build). In short:
+
+```bash
+cd frontend && npm ci && npm run build && cd ..
+FIELDSHIFT_ROOT="$PWD" FIELDSHIFT_STATIC_DIR="$PWD/frontend/build" BIND_ADDRESS=127.0.0.1:3000 \
+  cargo run --locked --release --manifest-path backend/Cargo.toml -p fieldshift-api
+```
+
+The Rust toolchain is pinned in [`rust-toolchain.toml`](rust-toolchain.toml) (same version in CI and `backend/Dockerfile`).
+
+**Python reference implementation (oracle for the differential tests):** runs inside a single reusable container (`fieldshift-dev`) without installing Python dependencies on the host.
 
 1. Start the container:
    ```bash
@@ -64,7 +75,7 @@ Development and testing run inside a single reusable container (`fieldshift-dev`
    docker compose exec -T dev ruff check .
    ```
 
-3. Run the Streamlit app locally (offline, using the versioned snapshot):
+3. Optionally run the legacy Streamlit app (reference only, not deployed):
    ```bash
    docker compose exec dev streamlit run app.py --server.port 8501 --server.address 0.0.0.0
    ```
@@ -72,11 +83,11 @@ Development and testing run inside a single reusable container (`fieldshift-dev`
 
 ---
 
-## Deployment on Streamlit Community Cloud
+## Deployment (Render Free, single container)
 
-Streamlit Community Cloud does **not** use Docker. It installs Python dependencies directly from the repository (`pyproject.toml` / `uv.lock`) and launches `app.py` at the repository root. All runtime computations operate offline using the committed snapshot in `data/snapshots/` and configuration files in `config/`.
+The public app is one Docker image built from `backend/Dockerfile` (repository root as build context): the Rust API, the SvelteKit static build, `config/` and the verified NASA POWER snapshot. It contains no Python and does not replay frozen reports; every result is computed in Rust. Details and limits of the free plan are in [`docs/HOSTING.md`](docs/HOSTING.md).
 
-- **Public App URL:** `[RESULT PENDING]`
+- **Public App URL:** https://fieldshift-optimizer.onrender.com
 
 ---
 
@@ -84,8 +95,11 @@ Streamlit Community Cloud does **not** use Docker. It installs Python dependenci
 
 ```text
 fieldshift-optimizer/
-├── app.py                          # Streamlit Cloud entrypoint
-├── compose.yaml                    # Reusable dev/test container definition
+├── app.py                          # Legacy Streamlit entrypoint (reference implementation, not deployed)
+├── backend/                        # Rust workspace: numeric, io, model, eval, cli, api (+ Dockerfile for deployment)
+├── frontend/                       # SvelteKit 5 + TypeScript static frontend (Vitest + Playwright)
+├── rust-toolchain.toml             # Pinned Rust toolchain (local, CI and container)
+├── compose.yaml                    # Dev/test container for the Python reference implementation
 ├── Dockerfile                      # Python 3.12 + uv container image
 ├── pyproject.toml                  # Project metadata and dependencies
 ├── uv.lock                         # Locked dependency versions
@@ -119,7 +133,7 @@ fieldshift-optimizer/
 │   ├── indicators.py               # Pure climate, cover, and diversity loss functions
 │   ├── optimization.py             # Scenarios, Pareto frontier, P0/P1/P1b/P2 selection
 │   ├── pipeline.py                 # End-to-end orchestration for the UI
-│   └── ui_app.py                   # Streamlit interface components
+│   └── ui_app.py                   # Legacy Streamlit interface (reference only)
 └── tests/                          # Unit, leakage, pipeline, and AppTest suites
 ```
 

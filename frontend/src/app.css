@@ -59,7 +59,7 @@ button {
 
 .topbar-source-link {
   display: none;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: #2c5736;
   text-decoration: underline;
@@ -111,7 +111,7 @@ button {
 .brand-word small {
   display: block;
   font-weight: 600;
-  font-size: 9px;
+  font-size: 12px;
   letter-spacing: 2.8px;
   color: #96b1a0;
   margin-top: 2px;
@@ -119,14 +119,15 @@ button {
 
 .section-label,
 .overline {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 1.6px;
-  color: #6f8577;
+  color: #55695c;
   text-transform: uppercase;
 }
 
 .section-label {
+  color: #8fa597;
   padding: 0 14px;
   margin-bottom: 12px;
 }
@@ -173,7 +174,7 @@ button {
   margin-top: auto;
   padding: 18px 12px 4px;
   border-top: 1px solid #263b30;
-  font-size: 11px;
+  font-size: 12px;
   color: #96aba0;
 }
 
@@ -189,7 +190,7 @@ button {
 }
 
 .sidebar-tag {
-  font-size: 11px;
+  font-size: 12px;
   color: #d4ead2;
   font-weight: 700;
   margin-bottom: 12px;
@@ -223,12 +224,12 @@ button {
 
 .breadcrumb {
   font-size: 12px;
-  color: #687c70;
+  color: #55695c;
 }
 
 .breadcrumb span {
   padding: 0 9px;
-  color: #b4c0b7;
+  color: #55695c;
 }
 
 .breadcrumb strong {
@@ -243,7 +244,7 @@ button {
 }
 
 .mode-pill {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 1px;
   color: #355840;
@@ -352,7 +353,7 @@ button {
 }
 
 .field-group label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: #3f5848;
 }
@@ -418,7 +419,7 @@ button {
   justify-content: space-between;
   gap: 12px;
   color: #b5cbb9;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 1.1px;
   flex-wrap: wrap;
 }
@@ -467,7 +468,7 @@ button {
 .verdict-number small {
   display: block;
   color: #bdd0c2;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .kpi-grid {
@@ -485,8 +486,8 @@ button {
 .kpi > span,
 .kpi small {
   display: block;
-  color: #63796b;
-  font-size: 11px;
+  color: #55695c;
+  font-size: 12px;
 }
 
 .kpi strong {
@@ -523,8 +524,8 @@ button {
 }
 
 .bar-label em {
-  font-size: 11px;
-  color: #667b6e;
+  font-size: 12px;
+  color: #55695c;
   font-style: normal;
   font-weight: 500;
   margin-left: 6px;
@@ -570,8 +571,8 @@ button {
 
 .comparison-metrics span {
   display: block;
-  color: #64796c;
-  font-size: 11px;
+  color: #55695c;
+  font-size: 12px;
 }
 
 .comparison-metrics strong {
@@ -593,8 +594,8 @@ button {
 
 .ci-card span,
 .ci-card small {
-  color: #5d7465;
-  font-size: 11px;
+  color: #55695c;
+  font-size: 12px;
 }
 
 .ci-card strong {
@@ -673,7 +674,7 @@ button {
 }
 
 .plot-shell text {
-  font-size: 10px;
+  font-size: 12px;
   fill: #5c7365;
 }
 
@@ -699,8 +700,8 @@ button {
 
 .evidence-grid small {
   display: block;
-  color: #5f7567;
-  font-size: 11px;
+  color: #55695c;
+  font-size: 12px;
 }
 
 .evidence-grid strong,
@@ -741,7 +742,7 @@ button {
   color: #2c5736;
   border-radius: 8px;
   padding: 8px 13px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   text-decoration: none;
 }
@@ -751,8 +752,8 @@ footer {
   justify-content: space-between;
   gap: 16px;
   padding: 18px 0 8px;
-  font-size: 11px;
-  color: #687c70;
+  font-size: 12px;
+  color: #55695c;
   flex-wrap: wrap;
 }
 
@@ -823,8 +824,8 @@ footer {
 .rule-source,
 .cell-note {
   display: block;
-  font-size: 11px;
-  color: #6a7f71;
+  font-size: 12px;
+  color: #55695c;
   margin-top: 3px;
   font-weight: 400;
 }
@@ -903,18 +904,18 @@ a.term {
 }
 
 .plan-inline {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
   color: #253d2e;
 }
 
 .plan-inline strong {
-  font-size: 9px;
+  font-size: 12px;
   color: #5b7063;
 }
 
 .plan-inline-sep {
-  color: #9aac9f;
+  color: #55695c;
 }
 
 .plan-inline .plan-id {
@@ -950,10 +951,10 @@ a.term {
 }
 
 .plan-year-label {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.6px;
-  color: #6a7f71;
+  color: #55695c;
   text-transform: uppercase;
   writing-mode: vertical-rl;
   transform: rotate(180deg);
@@ -977,7 +978,7 @@ a.term {
   border-radius: 8px;
   background: #e7f1e6;
   border: 1px solid #cfe0ce;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.3;
 }
 
@@ -992,7 +993,7 @@ a.term {
 }
 
 .chip-window {
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 800;
   color: #5b7063;
 }
@@ -1009,12 +1010,12 @@ a.term {
 .plan-timeline.compact .plan-chip {
   min-width: 78px;
   padding: 3px 6px;
-  font-size: 10.5px;
+  font-size: 12px;
 }
 
 .plan-id {
-  font-size: 10px;
-  color: #6a7f71;
+  font-size: 12px;
+  color: #55695c;
 }
 
 .pareto-figure {
@@ -1036,7 +1037,7 @@ a.term {
   gap: 8px 22px;
   align-items: center;
   margin-top: 8px;
-  font-size: 11px;
+  font-size: 12px;
   color: #3f5547;
 }
 
@@ -1138,12 +1139,38 @@ a.term {
   .navigation button {
     white-space: nowrap;
     padding: 8px 10px;
-    font-size: 11px;
+    font-size: 12px;
     flex: none;
     width: auto;
   }
   .nav-mark {
     display: none;
+  }
+  /* Touch targets: at least 44 px high on phones (WCAG 2.5.5). */
+  .navigation button,
+  .btn-primary,
+  .btn-secondary,
+  .field-group select,
+  .field-group input,
+  .glossary summary,
+  .evidence-links a,
+  .topbar-source-link,
+  footer a {
+    min-height: 44px;
+  }
+  .navigation button {
+    font-size: 13px;
+  }
+  .evidence-links a,
+  .topbar-source-link,
+  footer a {
+    display: inline-flex;
+    align-items: center;
+  }
+  /* keep the disclosure marker: grow the summary with padding instead of flex */
+  .glossary summary {
+    min-height: 0;
+    padding: 12px 0;
   }
   .content-wrap {
     padding: 18px 14px 24px;
@@ -1174,4 +1201,12 @@ a.term {
     text-align: left;
     margin-top: 14px;
   }
+}
+
+/* Links inside notices must look like links (Tailwind preflight removes the underline). */
+.info-banner a,
+.warning-banner a,
+.verdict-link {
+  text-decoration: underline;
+  font-weight: 700;
 }

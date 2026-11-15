@@ -1,0 +1,370 @@
+/* AI-assisted (OpenBot agent) */
+/* Styles for the five insight pieces (ProtectionStory, SowingRiskMap, EvidenceGapsRisks, SeasonReplay).
+   Text >= 12 px and contrast >= 4.5:1, like the rest of the app (block C). */
+
+.insight-block {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #e3ebe3;
+}
+
+.insight-block:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.insight-details > summary {
+  cursor: pointer;
+  list-style-position: outside;
+  margin-left: 16px;
+}
+
+.insight-details > summary h3 {
+  display: inline;
+}
+
+.insight-details:not([open]) > summary::after {
+  content: ' (select to expand)';
+  font-size: 12px;
+  color: #55695c;
+}
+
+.insight-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+  margin-bottom: 8px;
+}
+
+.outcome-badge {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: #7d1d18;
+  background: #fdf0ef;
+  border: 1px solid #eebcb8;
+  border-radius: 20px;
+  padding: 5px 12px;
+}
+
+.insight-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #253d2e;
+  margin: 0 0 8px;
+  max-width: 920px;
+}
+
+.insight-note,
+.insight-caveat {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #55695c;
+  margin: 6px 0;
+}
+
+.insight-caveat {
+  color: #6b3b00;
+  background: #fff6e5;
+  border: 1px solid #efd099;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.insight-two {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.year-chart {
+  margin: 0;
+  min-width: 0;
+}
+
+.year-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #fbfdfb;
+  border: 1px solid #e6eee6;
+  border-radius: 10px;
+}
+
+.year-chart svg text {
+  font-size: 12px;
+  fill: #55695c;
+}
+
+.year-chart svg .axis-title {
+  font-weight: 700;
+  fill: #35523e;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 12px;
+  color: #3f5547;
+  margin-top: 6px;
+}
+
+.legend-line {
+  display: inline-block;
+  width: 18px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.chart-data {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.chart-data summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: #24422e;
+}
+
+.premium-card {
+  border: 1px solid #e2ebe2;
+  background: #fafcfa;
+  border-radius: 12px;
+  padding: 14px;
+  min-width: 0;
+}
+
+.premium-card h4 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 800;
+  color: #1c3426;
+}
+
+.premium-plans {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.premium-plan {
+  border: 1px solid #e2ebe2;
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+
+.premium-plan h5 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #1c3426;
+}
+
+.premium-plan dl {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.premium-plan dl > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 12px;
+}
+
+.premium-plan dt {
+  font-size: 12px;
+  color: #55695c;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.premium-plan dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1c3426;
+  white-space: nowrap;
+}
+
+.replay-select {
+  max-width: 360px;
+  margin: 8px 0 10px;
+}
+
+.replay-low td,
+.replay-low th {
+  background: #eaf5ec;
+  font-weight: 700;
+}
+
+.replay-high td,
+.replay-high th {
+  background: #fdf0ef;
+}
+
+.risk-scroll-hint {
+  display: none;
+}
+
+.risk-map-scroll {
+  margin-top: 6px;
+  /* containing block for the visually hidden cell values, so they stay inside the scroll area */
+  position: relative;
+}
+
+.risk-map {
+  border-collapse: separate;
+  border-spacing: 2px;
+  font-size: 12px;
+}
+
+.risk-map th {
+  font-weight: 700;
+  color: #36503f;
+  padding: 4px 6px;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.risk-map th.corner {
+  text-align: left;
+  color: #55695c;
+  white-space: normal;
+  max-width: 96px;
+}
+
+/* "11 Sep" on two lines keeps the 12 columns inside the card down to ~700 px wide */
+.risk-map th.col-date {
+  white-space: normal;
+  line-height: 1.2;
+  min-width: 34px;
+  padding: 4px 2px;
+}
+
+.risk-cell {
+  width: 36px;
+  min-width: 36px;
+  height: 30px;
+  text-align: center;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.risk-cell.has-policy {
+  outline: 2px solid #111d17;
+  outline-offset: -2px;
+}
+
+.risk-cell.infeasible,
+.risk-swatch.infeasible {
+  background: repeating-linear-gradient(45deg, #f1f3f1, #f1f3f1 4px, #dde3dd 4px, #dde3dd 8px);
+}
+
+.risk-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  font-size: 12px;
+  color: #3f5547;
+  margin-top: 8px;
+}
+
+.risk-gradient {
+  display: inline-block;
+  width: 120px;
+  height: 12px;
+  border-radius: 6px;
+}
+
+.risk-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid #c9d6ca;
+}
+
+.egr-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.egr-card {
+  border: 1px solid #e2ebe2;
+  background: #fafcfa;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #253d2e;
+  min-width: 0;
+}
+
+.egr-card h4 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 800;
+  color: #1c3426;
+}
+
+.egr-card h5 {
+  margin: 8px 0 2px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #35523e;
+}
+
+.egr-card p {
+  margin: 0;
+}
+
+.egr-card ul {
+  margin: 0;
+  padding-left: 16px;
+  list-style: disc;
+}
+
+.egr-source {
+  display: block;
+  font-size: 12px;
+  color: #55695c;
+}
+
+@media (max-width: 1150px) {
+  .egr-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .insight-two {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .risk-scroll-hint {
+    display: block;
+  }
+  .egr-grid {
+    grid-template-columns: 1fr;
+  }
+  /* keep the disclosure marker (display: list-item) and reach a 44 px touch target */
+  .insight-details > summary,
+  .chart-data summary {
+    min-height: 44px;
+    padding: 12px 0;
+  }
+}

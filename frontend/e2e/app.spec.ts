@@ -420,4 +420,293 @@ test.describe('FieldShift Optimizer Rust + Svelte 5 E2E', () => {
     await dec1.selectOption('30');
     await expect(page.getByTestId('p0-feasibility-note')).toHaveCount(0);
   });
+
+  test('block C: heading order, table semantics, readable text and touch targets', async ({ page }, testInfo) => {
+    await page.goto('/');
+    await expect(page.getByTestId('outcome-heading')).toContainText('Outcome: NEGATIVE');
+    const report = await page.evaluate(() => {
+      const visible = (e: Element) => (e as HTMLElement).offsetParent !== null;
+      const levels = [...document.querySelectorAll('h1,h2,h3,h4,h5,h6')].filter(visible).map((h) => Number(h.tagName[1]));
+      const skips = levels.filter((l, i) => i > 0 && l > levels[i - 1] + 1);
+      const tables = [...document.querySelectorAll('table')].map((t) => ({
+        caption: (t.querySelector('caption')?.textContent ?? '').trim().length > 0,
+        scoped: [...t.querySelectorAll('th')].every((th) => ['col', 'row'].includes(th.getAttribute('scope') ?? ''))
+      }));
+      const small: string[] = [];
+      for (const el of document.querySelectorAll('body *')) {
+        if (el.closest('svg') || !visible(el)) continue;
+        const ownText = [...el.childNodes].some((n) => n.nodeType === 3 && (n.textContent ?? '').trim());
+        if (ownText && parseFloat(getComputedStyle(el).fontSize) < 12) small.push(`${el.tagName}.${el.className}`);
+      }
+      // Stand-alone controls (links inside sentences are exempt under WCAG 2.5.5/2.5.8).
+      const controls = [...document.querySelectorAll('button, select, input, summary, .evidence-links a, .topbar-source-link, footer a')]
+        .filter(visible)
+        .map((e) => ({ name: `${e.tagName}${e.id ? '#' + e.id : ''} ${(e.textContent ?? '').trim().slice(0, 20)}`, h: e.getBoundingClientRect().height }));
+      return { levels, skips, tables, small, controls };
+    });
+    expect(report.levels[0]).toBe(1);
+    expect(report.levels.filter((l) => l === 1)).toHaveLength(1);
+    expect(report.skips).toEqual([]);
+    expect(report.tables.length).toBeGreaterThanOrEqual(6);
+    expect(report.tables.every((t) => t.caption && t.scoped)).toBe(true);
+    expect(report.small).toEqual([]);
+    if (testInfo.project.name === 'mobile-chromium') {
+      const tooSmall = report.controls.filter((c) => c.h < 44);
+      expect(tooSmall).toEqual([]);
+    }
+  });
+
+  test('block D: link preview tags in the static HTML and cache/security headers', async ({ page, request }) => {
+    const html = await request.get('/');
+    expect(html.status()).toBe(200);
+    const body = await html.text();
+    for (const tag of ['og:title', 'og:description', 'og:image', 'og:url', 'twitter:card']) {
+      expect(body, tag).toContain(tag);
+    }
+    expect(body).toContain('https://fieldshift-optimizer.onrender.com/og-image.png');
+    const h = html.headers();
+    expect(h['cache-control']).toBe('no-cache');
+    expect(h['x-content-type-options']).toBe('nosniff');
+    expect(h['x-frame-options']).toBe('DENY');
+    expect(h['referrer-policy']).toBe('strict-origin-when-cross-origin');
+    expect(h['content-security-policy']).toContain("frame-ancestors 'none'");
+
+    const image = await request.get('/og-image.png');
+    expect(image.status()).toBe(200);
+    expect(image.headers()['content-type']).toBe('image/png');
+
+    const api = await request.get('/v1/health');
+    expect(api.headers()['cache-control']).toBe('no-store');
+
+    // The page still works under the CSP (no blocked inline script, no console errors).
+    const errors: string[] = [];
+    page.on('console', (m) => {
+      if (m.type() === 'error') errors.push(m.text());
+    });
+    await page.goto('/');
+    await expect(page.getByTestId('outcome-heading')).toContainText('Outcome: NEGATIVE');
+    const asset = await page.evaluate(() =>
+      performance.getEntriesByType('resource').map((r) => r.name).find((n) => n.includes('/_app/immutable/'))
+    );
+    expect(asset).toBeTruthy();
+    const assetResp = await request.get(new URL(asset!).pathname);
+    expect(assetResp.headers()['cache-control']).toBe('public, max-age=31536000, immutable');
+    expect(errors).toEqual([]);
+  });
+
+  // ---------------------------------------------------------------- insight pieces (ui-d)
+  type Ev = {
+    test: string[];
+    M5_price_of_robustness: number;
+    dry_test_scenarios: string[];
+    policies: Record<string, { M1_max_regret: number; M3_dry_mean_loss: number; per_scenario_regret: number[]; loss_mean_climate: number }>;
+    comparisons: Array<{ a: string; b: string; wins: number; ties: number; losses: number; classification: string }>;
+  };
+  async function liveEvaluate(request: import('@playwright/test').APIRequestContext): Promise<Ev> {
+    const r = await request.post('/v1/evaluate', { data: {} });
+    expect(r.status()).toBe(200);
+    return (await r.json()) as Ev;
+  }
+  function trackConsole(page: Page): string[] {
+    const errors: string[] = [];
+    page.on('console', (m) => {
+      if (m.type() === 'error') errors.push(m.text());
+    });
+    page.on('pageerror', (e) => errors.push(e.message));
+    return errors;
+  }
+
+  test('pieces 1-2: P2 shown as protection with the primary NEGATIVE result, numbers equal to the live API', async ({ page, request }) => {
+    const errors = trackConsole(page);
+    const ev = await liveEvaluate(request);
+    await page.goto('/');
+    await expect(page.getByTestId('outcome-heading')).toContainText('Outcome: NEGATIVE');
+    const story = page.getByTestId('protection-story');
+    await expect(story).toBeVisible();
+    await expect(page.getByTestId('protection-story-outcome')).toHaveText('Primary outcome: NEGATIVE');
+
+    const p1 = ev.policies.P1.M1_max_regret;
+    const p1b = ev.policies.P1b.M1_max_regret;
+    const p2 = ev.policies.P2.M1_max_regret;
+    const vsP1 = ev.comparisons.find((c) => c.a === 'P2' && c.b === 'P1')!;
+    const pct = Math.round(((p1 - p2) / p1) * 100);
+    await expect(page.getByTestId('story-primary')).toContainText(`P2 vs P1b`);
+    await expect(page.getByTestId('story-primary')).toContainText(`${p2.toFixed(4)} against ${p1b.toFixed(4)}`);
+    await expect(page.getByTestId('story-primary')).toContainText('did not reduce the maximum regret. Classification: NEGATIVE.');
+    await expect(page.getByTestId('story-secondary')).toContainText(`Secondary comparison`);
+    await expect(page.getByTestId('story-secondary')).toContainText(`from ${p1.toFixed(4)} to ${p2.toFixed(4)} (${pct}% less)`);
+    await expect(page.getByTestId('story-tradeoff')).toContainText(`${ev.M5_price_of_robustness.toFixed(4)} more loss in the average climate (M5)`);
+    await expect(page.getByTestId('story-tradeoff')).toContainText(`${vsP1.wins} wins, ${vsP1.ties} ties and ${vsP1.losses} losses against P1`);
+
+    const card = page.getByTestId('premium-card');
+    await expect(card).toBeVisible();
+    await expect(page.getByTestId('premium-row-P2')).toContainText(`+${ev.M5_price_of_robustness.toFixed(4)} (M5)`);
+    const p1bPremium = ev.policies.P1b.loss_mean_climate - ev.policies.P1.loss_mean_climate;
+    await expect(page.getByTestId('premium-row-P1b')).toContainText(`+${p1bPremium.toFixed(4)}`);
+    await expect(page.getByTestId('premium-caveat')).toContainText('primary test is P2 vs P1b');
+    await expect(page.getByTestId('premium-caveat')).toContainText('NEGATIVE');
+    await expect(page.getByTestId('year-chart').locator('polyline')).toHaveCount(3);
+    await expectNoHorizontalOverflow(page);
+    expect(errors).toEqual([]);
+  });
+
+  test('piece 3: sowing-date risk map with legend, policy markers and infeasible cells', async ({ page }) => {
+    const errors = trackConsole(page);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    await expect(page.getByTestId('outcome-heading')).toContainText('Outcome: NEGATIVE');
+    // Collapsed on Overview, expanded in its own tab.
+    await expect(page.getByTestId('sowing-risk-map')).not.toHaveAttribute('open', '');
+    await page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('button', { name: 'Pareto and alternatives' }).click();
+    const map = page.getByTestId('sowing-risk-map');
+    await expect(map).toHaveAttribute('open', '');
+    const table = page.getByTestId('risk-map-table');
+    await expect(table.locator('thead th')).toHaveCount(13);
+    await expect(table.locator('tbody tr')).toHaveCount(12);
+    for (const p of ['P1', 'P1b', 'P2']) {
+      await expect(table.locator('td.has-policy', { hasText: p }).first()).toBeVisible();
+    }
+    await expect(table.locator('td.infeasible').first()).toContainText('infeasible');
+    await expect(page.getByTestId('risk-map-legend')).toContainText('Mean exposure');
+    await expect(page.getByTestId('risk-map-legend')).toContainText('Infeasible');
+    // Switching to the current plan's crop sequence shows the P0 marker.
+    const option = page.getByTestId('risk-map-select').locator('option', { hasText: '— P0' });
+    await page.getByTestId('risk-map-select').selectOption(await option.getAttribute('value') as string);
+    await expect(table.locator('td.has-policy', { hasText: 'P0' })).toHaveCount(1);
+    await expectNoHorizontalOverflow(page);
+    expect(errors).toEqual([]);
+  });
+
+  test('piece 4: Evidence, Gaps and Risks cards for the four policies', async ({ page, request }) => {
+    const errors = trackConsole(page);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const run = (await (await request.post('/v1/run', { data: {} })).json()) as {
+      weights: number[];
+      sensitivity: Array<Record<string, number[]> & { weights: number[] }>;
+    };
+    const ev = await liveEvaluate(request);
+    await page.goto('/');
+    await expect(page.getByTestId('outcome-heading')).toContainText('Outcome: NEGATIVE');
+    await page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('button', { name: 'Policy comparison' }).click();
+    const block = page.getByTestId('evidence-gaps-risks');
+    await expect(block).toHaveAttribute('open', '');
+    for (const p of ['P0', 'P1', 'P1b', 'P2']) {
+      const card = page.getByTestId(`egr-card-${p}`);
+      for (const h of ['Evidence', 'Gaps', 'Risks']) {
+        await expect(card.locator('h5', { hasText: new RegExp(`^${h}$`) })).toBeVisible();
+      }
+      await expect(card).toContainText(ev.policies[p].M1_max_regret.toFixed(4));
+      await expect(card).toContainText(ev.policies[p].M3_dry_mean_loss.toFixed(4));
+    }
+    const def = run.sensitivity.find((r) => r.weights.every((w, i) => Math.abs(w - run.weights[i]) < 1e-12))!;
+    for (const p of ['P1', 'P1b', 'P2']) {
+      const changed = run.sensitivity.filter((r) => r[p].join(',') !== def[p].join(',')).length;
+      await expect(page.getByTestId(`egr-weights-${p}`)).toHaveText(`${changed}/${run.sensitivity.length}`);
+    }
+    await expect(page.getByTestId('evidence-shared')).toContainText('28 construction pairs');
+    await expect(page.getByTestId('evidence-shared')).toContainText('14');
+    await expect(page.getByTestId('egr-card-P0')).toContainText('[N] docs/EVALUATION_PROTOCOL.md §2');
+    await expectNoHorizontalOverflow(page);
+    expect(errors).toEqual([]);
+  });
+
+  test('piece 5: replay selector changes the regrets, matching per_scenario_regret', async ({ page, request }) => {
+    const errors = trackConsole(page);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const ev = await liveEvaluate(request);
+    await page.goto('/');
+    await expect(page.getByTestId('outcome-heading')).toContainText('Outcome: NEGATIVE');
+    await page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('button', { name: 'Retrospective evaluation' }).click();
+    const select = page.locator('#replay-pair');
+    await expect(select.locator('option')).toHaveCount(ev.test.length);
+    await expect(page.getByTestId('replay-result')).toHaveAttribute('aria-live', 'polite');
+    await expect(page.getByTestId('season-replay')).toContainText('not a forecast');
+
+    for (const idx of [0, 10]) {
+      await select.selectOption(String(idx));
+      for (const p of ['P0', 'P1', 'P1b', 'P2']) {
+        await expect(page.getByTestId(`replay-value-${p}`)).toHaveText(ev.policies[p].per_scenario_regret[idx].toFixed(4));
+      }
+      const values = ['P0', 'P1', 'P1b', 'P2'].map((p) => ev.policies[p].per_scenario_regret[idx]);
+      const lowest = ['P0', 'P1', 'P1b', 'P2'][values.indexOf(Math.min(...values))];
+      await expect(page.getByTestId(`replay-row-${lowest}`)).toContainText('Lowest regret');
+    }
+    await expect(select.locator('option:checked')).toHaveText(new RegExp(`^${ev.test[10]}`));
+    await expectNoHorizontalOverflow(page);
+    expect(errors).toEqual([]);
+  });
+
+  // ---------------------------------------------------------------- card containment (ui-d fix)
+  /**
+   * Everything inside a card must stay within the card's right edge, and no scroll container inside it
+   * may need horizontal scrolling. `allowScroll` lists selectors where sideways scrolling is intended.
+   */
+  async function cardContainment(page: Page, testId: string, allowScroll: string[] = []) {
+    return page.getByTestId(testId).evaluate((card, allow) => {
+      const edge = card.getBoundingClientRect().right;
+      const allowed = (el: Element) => allow.some((sel) => el.closest(sel));
+      const past: string[] = [];
+      const scrolling: string[] = [];
+      for (const el of [card, ...card.querySelectorAll('*')]) {
+        const style = getComputedStyle(el);
+        if ((el as HTMLElement).offsetParent === null && style.position !== 'fixed') continue;
+        const r = el.getBoundingClientRect();
+        if (r.width <= 1) continue; // visually hidden text
+        const name = `${el.tagName.toLowerCase()}.${String(el.className).split(' ')[0]} "${(el.textContent ?? '').trim().slice(0, 24)}"`;
+        if (style.overflowX !== 'visible' && el.scrollWidth > el.clientWidth + 1 && !allowed(el)) scrolling.push(name);
+        if (r.right > edge + 1 && !allowed(el)) past.push(`${name} right=${Math.round(r.right)} edge=${Math.round(edge)}`);
+      }
+      return { past: past.slice(0, 6), scrolling: scrolling.slice(0, 6) };
+    }, allowScroll);
+  }
+
+  const CONTAINMENT_VIEWPORTS: Record<string, Array<{ width: number; height: number }>> = {
+    'desktop-chromium': [
+      { width: 1280, height: 800 },
+      { width: 1024, height: 768 }
+    ],
+    'mobile-chromium': [{ width: 390, height: 844 }]
+  };
+
+  test('premium x protection card fits its content at 1280, 1024 and 390 px (no clipped column)', async ({ page }, testInfo) => {
+    await page.goto('/');
+    await expect(page.getByTestId('outcome-heading')).toContainText('Outcome: NEGATIVE');
+    for (const vp of CONTAINMENT_VIEWPORTS[testInfo.project.name] ?? []) {
+      await page.setViewportSize(vp);
+      await expect(page.getByTestId('premium-card')).toBeVisible();
+      const res = await cardContainment(page, 'premium-card');
+      expect(res, `${vp.width}x${vp.height}`).toEqual({ past: [], scrolling: [] });
+      // the protection value is fully readable
+      await expect(page.getByTestId('premium-row-P2')).toContainText('0.2811 → 0.1744');
+      await expectNoHorizontalOverflow(page);
+    }
+  });
+
+  test('map, Evidence/Gaps/Risks and replay cards stay inside their edges at 1280, 1024 and 390 px', async ({ page }, testInfo) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    await expect(page.getByTestId('outcome-heading')).toContainText('Outcome: NEGATIVE');
+    const nav = page.getByRole('navigation', { name: 'Primary navigation' });
+    for (const vp of CONTAINMENT_VIEWPORTS[testInfo.project.name] ?? []) {
+      await page.setViewportSize(vp);
+      const phone = vp.width < 720;
+      for (const [tab, id] of [
+        ['Pareto and alternatives', 'sowing-risk-map'],
+        ['Policy comparison', 'evidence-gaps-risks'],
+        ['Retrospective evaluation', 'season-replay']
+      ] as const) {
+        await nav.getByRole('button', { name: tab }).click();
+        // On phones the 12 x 12 grid scrolls sideways inside its own box (announced by a hint);
+        // at 1024 px and wider it must fit.
+        const allow = phone && id === 'sowing-risk-map' ? ['.risk-map-scroll'] : [];
+        const res = await cardContainment(page, id, allow);
+        expect(res, `${id} at ${vp.width}x${vp.height}`).toEqual({ past: [], scrolling: [] });
+        if (phone && id === 'sowing-risk-map') {
+          await expect(page.getByTestId(id).locator('.risk-scroll-hint')).toBeVisible();
+        }
+      }
+      await expectNoHorizontalOverflow(page);
+    }
+  });
 });
+

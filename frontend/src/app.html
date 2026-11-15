@@ -5,6 +5,20 @@
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect rx='22' width='100' height='100' fill='%23132923'/%3E%3Cpath d='M18 72Q32 19 80 25Q63 75 18 72Z' fill='%238cc68d'/%3E%3C/svg%3E" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#101b18" />
+    <!-- Link previews (Open Graph / Twitter). The app renders on the client (ssr = false), and link
+         crawlers do not run JavaScript, so these tags live in the static shell. Absolute URLs point at
+         the public deployment; update them if the site moves. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="FieldShift Optimizer" />
+    <meta property="og:title" content="FieldShift Optimizer: crop rotation decision support under climate uncertainty" />
+    <meta property="og:description" content="Compare a rainfed two-year crop rotation in Rio Verde, Goiás with optimized alternatives over past climate years, using NASA POWER data and ZARC sowing-risk limits. Decision support only." />
+    <meta property="og:url" content="https://fieldshift-optimizer.onrender.com/" />
+    <meta property="og:image" content="https://fieldshift-optimizer.onrender.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="FieldShift Optimizer: which crop rotation holds up best when the weather varies?" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="description" content="Support rainfed crop rotation decisions in Rio Verde, Goiás with verified NASA POWER data, ZARC constraints and transparent retrospective evaluation." />
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">

@@ -1,0 +1,6 @@
+# Single Rust toolchain for local builds, CI (.github/workflows/rust-migration.yml) and the
+# container (backend/Dockerfile). Bump all three together; Cargo's `rust-version` follows it.
+[toolchain]
+channel = "1.98.1"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

@@ -1,7 +1,7 @@
 <!-- AI-assisted (OpenBot agent) -->
 # Rust hosting preparation
 
-Status: prepared, **not deployed**. Sources checked 2026-11-14. [V] means verified in official documentation; [N] means account/runtime verification still required. No provider account, billing setting, publication or public endpoint was changed.
+Status: **deployed** on Render Free (milestone E10, 2026-11-14) at https://fieldshift-optimizer.onrender.com, as a Docker web service with auto-deploy off (redeploys are manual). Sources checked 2026-11-14. [V] means verified in official documentation; [N] means account/runtime verification still required. The notes below are the preparation analysis that led to this choice; no paid resources or billing were added.
 
 ## Preferred: one Render Free Web Service
 

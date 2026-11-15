@@ -2,7 +2,7 @@
 
 > **Target:** [Field Shift: Adapting Farms with NASA Data](https://www.spaceappschallenge.org/2026/challenges/adapting-farms-with-nasa-data/)
 > **Internal Deadline:** 2026-11-15 21:00 BRT (Official Deadline: 2026-11-15 23:59 in Team Owner's timezone).
-> **Note:** Do **not** submit externally without explicit user approval. Remaining `[RESULT PENDING]` slots are strictly for the live app URL, unproduced demo video/deck link, team member details, and SI media confirmation (application screenshots are already linked from `docs/assets/`).
+> **Note:** Do **not** submit externally without explicit user approval. Remaining `[RESULT PENDING]` slots are strictly for unproduced demo video/deck link, team member details, and SI media confirmation (application screenshots are already linked from `docs/assets-rust/`).
 
 ---
 
@@ -26,7 +26,7 @@ Format: [RESULT PENDING: 7-slide deck / 30-second video]
 
 ### Link to Final Project
 ```text
-Live App URL: [RESULT PENDING: public Streamlit Community Cloud URL without login]
+Live App URL: https://fieldshift-optimizer.onrender.com (no login)
 Public Repository URL: https://github.com/Marcux777/fieldshift-optimizer (public, MIT license)
 ```
 
@@ -36,7 +36,7 @@ Public Repository URL: https://github.com/Marcux777/fieldshift-optimizer (public
 Rainfed farmers in Rio Verde (Goiás, Brazil) choose multi-season crop rotations under substantial rainfall and dry-spell uncertainty. A rotation that looks optimal under average historical weather can suffer high climate exposure during dry years, while a worst-case-focused plan may sacrifice performance in typical years. FieldShift Optimizer helps explore a practical question: *"How do different crop rotation strategies compare when we do not know which climate conditions will occur?"*
 
 ### What the Application Delivers
-FieldShift Optimizer is a Streamlit decision-support tool for a two-agricultural-year, four-window (`J1`–`J4`) rainfed planning horizon. Users specify soil parameters (`AD1–AD6` water-availability class and texture), baseline rotation (`P0`), and objective preferences. The engine enumerates all `576` agronomically feasible rotations (at default `AD4 + clayey` soil) under official ZARC 2026/27 (`<= 20%` risk) and Goiás legal sowing/sanitary-void rules (`IN Agrodefesa 6/2024`), computes three normalized `[0, 1]` objectives (climate exposure `g1`, vegetation cover discontinuity `g2`, crop diversity deficit `g3`), maps the Pareto frontier (`36` distinct non-dominated objective vectors; `50` plans including `14` vector ties; `6` distinct crop-signature alternatives), and compares four strategies side by side:
+FieldShift Optimizer is a web decision-support tool (Rust API + SvelteKit frontend) for a two-agricultural-year, four-window (`J1`–`J4`) rainfed planning horizon. Users specify soil parameters (`AD1–AD6` water-availability class and texture), baseline rotation (`P0`), and objective preferences. The engine enumerates all `576` agronomically feasible rotations (at default `AD4 + clayey` soil) under official ZARC 2026/27 (`<= 20%` risk) and Goiás legal sowing/sanitary-void rules (`IN Agrodefesa 6/2024`), computes three normalized `[0, 1]` objectives (climate exposure `g1`, vegetation cover discontinuity `g2`, crop diversity deficit `g3`), maps the Pareto frontier (`36` distinct non-dominated objective vectors; `50` plans including `14` vector ties; `6` distinct crop-signature alternatives), and compares four strategies side by side:
 - **Current Plan (`P0`):** User-selected baseline rotation.
 - **Conventional Optimization (`P1`):** Best plan under average construction-period climate.
 - **Expected-Loss Optimization (`P1b`):** Best average loss across historical construction scenarios.
@@ -98,10 +98,10 @@ Other References:
 
 | Slide | Section | Content |
 |---|---|---|
-| **1** | **Title & Team** | **FieldShift Optimizer** — Explore and Compare Crop Rotation Trade-offs Under Climate Uncertainty<br>Challenge: *Field Shift: Adapting Farms with NASA Data* (`spaceappschallenge.org/2026/challenges/adapting-farms-with-nasa-data/`)<br>Team: `[RESULT PENDING: member names & roles]`<br>Public Repo: `https://github.com/Marcux777/fieldshift-optimizer` (public, MIT license)<br>Public App: `[RESULT PENDING: live URL]` |
+| **1** | **Title & Team** | **FieldShift Optimizer** — Explore and Compare Crop Rotation Trade-offs Under Climate Uncertainty<br>Challenge: *Field Shift: Adapting Farms with NASA Data* (`spaceappschallenge.org/2026/challenges/adapting-farms-with-nasa-data/`)<br>Team: `[RESULT PENDING: member names & roles]`<br>Public Repo: `https://github.com/Marcux777/fieldshift-optimizer` (public, MIT license)<br>Public App: `https://fieldshift-optimizer.onrender.com` |
 | **2** | **The Challenge** | Rainfed 2-year rotation planning in Rio Verde (GO) faces rainfall and dry-spell uncertainty; average-climate plans can struggle in dry years, while worst-case plans can cost performance in typical years. |
 | **3** | **How NASA Data Makes It Possible** | NASA POWER Daily API (`v2.10.3`, `1981–2025`, `16,436` days, `PRECTOTCORR`, `T2M_MAX`, `T2M_MIN`) in a versioned offline snapshot enables 28 construction pairs (`1981/82–2009/10`) and 14 held-out test pairs (`2010/11–2024/25`). |
-| **4** | **Project Image & Architecture** | Screenshots captured directly from the Streamlit app (`docs/assets/`): `app-pareto.png` (Pareto trade-off view) and `app-negative-evaluation.png` (honest negative evaluation view); additional captures: `app-nasa-sources.png`, `app-ad1-p0-infeasible.png`.<br>ZARC `<= 20%` filter (`576` feasible plans) + 3-objective scoring (`g1`, `g2`, `g3`) + `P0 / P1 / P1b / P2` comparison + `36` distinct non-dominated objective vectors (`50` plans with `14` vector ties; `6` distinct alternatives). |
+| **4** | **Project Image & Architecture** | Screenshots captured directly from the deployed Rust + SvelteKit app (`docs/assets-rust/`): `app-verdict.png` (honest negative evaluation view), `app-pareto.png` (Pareto trade-off view) and `app-overview-mobile.png`. The older Streamlit captures in `docs/assets/` show the reference implementation.<br>ZARC `<= 20%` filter (`576` feasible plans) + 3-objective scoring (`g1`, `g2`, `g3`) + `P0 / P1 / P1b / P2` comparison + `36` distinct non-dominated objective vectors (`50` plans with `14` vector ties; `6` distinct alternatives). |
 | **5** | **User Experience** | 3-step workflow: (1) select soil (`AD1–AD6` & texture) and baseline `P0`; (2) compare strategies & inspect Pareto trade-offs; (3) review 15-weight sensitivity, cost of robustness (`M5 = 0.0080`), assumptions, and data gaps. |
 | **6** | **Retrospective Evaluation & Caution** | **Honest Outcome: NEGATIVE.** `P2` vs. `P1b`: max regret `0.1744` vs. `0.1466` (median `D = +0.0064`, CI `[-0.0609, +0.0375]`). `P2` vs. `P1`: `2` wins, `4` ties, `8` losses. `P0` worst (`0.3196`).<br>Caution: supports—does not replace—farmer judgment; no promises of yield, profit, water, or soil; no claim of novelty. |
 | **7** | **References, SI Disclosure & Access** | Key sources (NASA POWER, MAPA ZARC, Agrodefesa, Embrapa), SI disclosure summary (`[RESULT PENDING: demo media SI status]`), and public no-login links (`[RESULT PENDING]`). |
@@ -122,8 +122,8 @@ Other References:
 - [ ] **Team Eligibility:** 2 to 6 human members, all registered in the same **Universal Event**; team owner and timezone confirmed.
 - [ ] **Language:** All Project Page fields and demo materials written in **English** (if any video speech is not in English, English subtitles are required).
 - [ ] **Demo Limit:** Video is `<= 30 seconds` OR presentation is `<= 7 slides` (including title slide). Exceeding this makes the project ineligible for global judging.
-- [ ] **Public Links (No Login):** Both `Link to Demo` and `Link to Final Project` (live Streamlit app + public GitHub repo `Marcux777/fieldshift-optimizer`) tested in a **private/incognito browser window** without login.
-- [ ] **FortiGuard Classification:** Submit the newly deployed Streamlit URL through the FortiGuard URL classification form (recommended in Submission Guide).
+- [ ] **Public Links (No Login):** Both `Link to Demo` and `Link to Final Project` (live app https://fieldshift-optimizer.onrender.com + public GitHub repo `Marcux777/fieldshift-optimizer`) tested in a **private/incognito browser window** without login.
+- [ ] **FortiGuard Classification:** Submit the deployed app URL (https://fieldshift-optimizer.onrender.com) through the FortiGuard URL classification form (recommended in Submission Guide).
 - [ ] **Mandatory Checkboxes:** `Terms and Conditions` and `Confirm All Work is Original` checked on the submission form.
 - [ ] **Media Compliance:** No images, voices, or likeness of minors under 18; no NASA branding/logo in generated content.
 - [ ] **SI Disclosure:** Completed in both `Use of SI` text and repository metadata (`docs/AI_USE.md`); visible watermark verified if any SI-generated media is used (`[RESULT PENDING]`).

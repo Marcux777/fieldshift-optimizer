@@ -1,5 +1,6 @@
 # Ambiente de desenvolvimento e teste (reutilizável): docker compose up -d dev; docker compose exec dev <cmd>
-# O deploy NÃO usa Docker: Streamlit Community Cloud instala a partir do repositório.
+# Este serviço é só para a implementação Python de referência (oráculo dos testes diferenciais).
+# O app público roda outro contêiner: Rust + SvelteKit (backend/Dockerfile) no Render Free; ver docs/HOSTING.md.
 name: fieldshift
 x-shared-cache-uv: &shared-cache-uv ${DOCKER_SHARED_CACHE_ROOT:-${HOME}/.cache/docker-shared}/uv:/home/app/.cache/uv:z
 services:

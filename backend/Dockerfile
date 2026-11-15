@@ -11,6 +11,8 @@ RUN npm run check && npm run build
 
 FROM rust:1.98-bookworm AS backend
 WORKDIR /build/backend
+# Same toolchain as local builds and CI (rustup picks it up from the parent directory).
+COPY rust-toolchain.toml /build/rust-toolchain.toml
 COPY backend/Cargo.toml backend/Cargo.lock ./
 COPY backend/crates ./crates
 RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry \

@@ -3,6 +3,10 @@
   import { onMount, tick } from 'svelte';
   import '../app.css';
   import ParetoChart from '$lib/components/ParetoChart.svelte';
+  import EvidenceGapsRisks from '$lib/components/EvidenceGapsRisks.svelte';
+  import ProtectionStory from '$lib/components/ProtectionStory.svelte';
+  import SeasonReplay from '$lib/components/SeasonReplay.svelte';
+  import SowingRiskMap from '$lib/components/SowingRiskMap.svelte';
   import PlanTimeline from '$lib/components/PlanTimeline.svelte';
   import {
     ALTERNATIVE_REASON_LABELS,
@@ -63,6 +67,7 @@
   type TabName = (typeof TABS)[number];
 
   const POLICY_KEYS = ['P0', 'P1', 'P1b', 'P2'] as const;
+
 
   // Element each navigation item scrolls to (ids are set on the result sections below).
   const TAB_TARGETS: Readonly<Record<TabName, string>> = {
@@ -425,10 +430,6 @@
 
 <svelte:head>
   <title>{activeTab} | FieldShift Optimizer: climate-aware crop rotation decision support</title>
-  <meta
-    name="description"
-    content="Support rainfed crop rotation decisions in Rio Verde, Goiás with verified NASA POWER data, ZARC constraints and transparent retrospective evaluation."
-  />
 </svelte:head>
 
 {#snippet inputsPanel()}
@@ -937,14 +938,15 @@
 
               <div class="table-scroll mb-4">
                 <table class="data-table">
+                  <caption class="sr-only">Policies P0–P2: chosen plan and held-out test regret (M1, M2, mean loss)</caption>
                   <thead>
                     <tr>
-                      <th>Policy</th>
-                      <th>Feasible</th>
-                      <th>Plan (crop and sowing per window)</th>
-                      <th>Max test regret (M1)</th>
-                      <th>Mean test regret (M2)</th>
-                      <th>Mean test loss</th>
+                      <th scope="col">Policy</th>
+                      <th scope="col">Feasible</th>
+                      <th scope="col">Plan (crop and sowing per window)</th>
+                      <th scope="col">Max test regret (M1)</th>
+                      <th scope="col">Mean test regret (M2)</th>
+                      <th scope="col">Mean test loss</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -993,12 +995,13 @@
                     {:else if entry?.plan}
                       <div class="table-scroll mb-3">
                         <table class="data-table">
+                          <caption class="sr-only">{key} plan: crop, sowing and harvest date for each window</caption>
                           <thead>
                             <tr>
-                              <th>Window</th>
-                              <th>Crop</th>
-                              <th>Sowing</th>
-                              <th>Harvest</th>
+                              <th scope="col">Window</th>
+                              <th scope="col">Crop</th>
+                              <th scope="col">Sowing</th>
+                              <th scope="col">Harvest</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1030,6 +1033,8 @@
                   </div>
                 {/each}
               </div>
+
+              <EvidenceGapsRisks run={runResult} report={evalReport} {catalog} collapsed={activeTab === 'Overview'} />
             </section>
           {/if}
 
@@ -1064,14 +1069,15 @@
 
               <div class="table-scroll">
                 <table class="data-table" data-testid="alternatives-table">
+                  <caption class="sr-only">Pareto alternatives: one row per plan, grouped by crop sequence, with construction objectives</caption>
                   <thead>
                     <tr>
-                      <th>Group</th>
-                      <th>Policy / reason</th>
-                      <th>Plan (crop and sowing per window)</th>
-                      <th>On front</th>
-                      <th>Objectives (mean exp / worst exp / cov / div)</th>
-                      <th>Min. crop difference</th>
+                      <th scope="col">Group</th>
+                      <th scope="col">Policy / reason</th>
+                      <th scope="col">Plan (crop and sowing per window)</th>
+                      <th scope="col">On front</th>
+                      <th scope="col">Objectives (mean exp / worst exp / cov / div)</th>
+                      <th scope="col">Min. crop difference</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1093,6 +1099,8 @@
                   </tbody>
                 </table>
               </div>
+
+              <SowingRiskMap run={runResult} {catalog} collapsed={activeTab === 'Overview'} />
             </section>
           {/if}
 
@@ -1110,18 +1118,22 @@
                 </button>
               </div>
 
+              <ProtectionStory report={evalReport} />
+
+
               <div class="table-scroll mb-3">
                 <table class="data-table" data-testid="comparisons-table">
+                  <caption class="sr-only">Primary and secondary comparisons on the held-out years: classification, reason and statistics</caption>
                   <thead>
                     <tr>
-                      <th>Comparison</th>
-                      <th>Classification</th>
-                      <th>Why (protocol rule applied)</th>
-                      <th>Max regret (A vs B)</th>
-                      <th>Median Δ regret</th>
-                      <th>95% CI (median Δ)</th>
-                      <th>Wins / Ties / Losses</th>
-                      <th>Wilcoxon non-overlap (p)</th>
+                      <th scope="col">Comparison</th>
+                      <th scope="col">Classification</th>
+                      <th scope="col">Why (protocol rule applied)</th>
+                      <th scope="col">Max regret (A vs B)</th>
+                      <th scope="col">Median Δ regret</th>
+                      <th scope="col">95% CI (median Δ)</th>
+                      <th scope="col">Wins / Ties / Losses</th>
+                      <th scope="col">Wilcoxon non-overlap (p)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1170,20 +1182,21 @@
 
               <div class="table-scroll">
                 <table class="data-table">
+                  <caption class="sr-only">Held-out metrics M0–M5 for each policy</caption>
                   <thead>
                     <tr>
-                      <th>Policy</th>
-                      <th>Feasible</th>
-                      <th>
+                      <th scope="col">Policy</th>
+                      <th scope="col">Feasible</th>
+                      <th scope="col">
                         <a class="term" href="#glossary-m0-m5" title={glossaryTitle('m0-m5')} onclick={(e) => openGlossary(e, 'm0-m5')}>M1 max regret</a>
                       </th>
-                      <th>M2 mean regret</th>
-                      <th>M2 median regret</th>
-                      <th>M3 dry loss</th>
-                      <th>M3 dry regret</th>
-                      <th>M4a regret ≤ ε</th>
-                      <th>M4b IQR loss</th>
-                      <th>
+                      <th scope="col">M2 mean regret</th>
+                      <th scope="col">M2 median regret</th>
+                      <th scope="col">M3 dry loss</th>
+                      <th scope="col">M3 dry regret</th>
+                      <th scope="col">M4a regret ≤ ε</th>
+                      <th scope="col">M4b IQR loss</th>
+                      <th scope="col">
                         <a class="term" href="#glossary-m4c" title={glossaryTitle('m4c')} onclick={(e) => openGlossary(e, 'm4c')}>M4c LOO Hamming</a>
                       </th>
                     </tr>
@@ -1207,6 +1220,8 @@
                   </tbody>
                 </table>
               </div>
+
+              <SeasonReplay report={evalReport} collapsed={activeTab === 'Overview'} />
             </section>
           {/if}
 
@@ -1227,16 +1242,17 @@
               </p>
               <div class="table-scroll">
                 <table class="data-table" data-testid="sensitivity-table">
+                  <caption class="sr-only">Weight sensitivity: plans chosen and held-out classification for the 15 fixed weight settings</caption>
                   <thead>
                     <tr>
-                      <th>#</th>
-                      <th>Weights (Exposure / Coverage / Diversity)</th>
-                      <th>P2 vs P1b (held-out)</th>
-                      <th>P2 vs P1 (held-out)</th>
-                      <th>M1 test: P1 / P1b / P2</th>
-                      <th>P1 plan</th>
-                      <th>P1b plan</th>
-                      <th>P2 plan</th>
+                      <th scope="col">#</th>
+                      <th scope="col">Weights (Exposure / Coverage / Diversity)</th>
+                      <th scope="col">P2 vs P1b (held-out)</th>
+                      <th scope="col">P2 vs P1 (held-out)</th>
+                      <th scope="col">M1 test: P1 / P1b / P2</th>
+                      <th scope="col">P1 plan</th>
+                      <th scope="col">P1b plan</th>
+                      <th scope="col">P2 plan</th>
                     </tr>
                   </thead>
                   <tbody>

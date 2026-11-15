@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, feat/rust-svelte-migration]
   pull_request:
-    paths: ['backend/**', 'frontend/**', 'fixtures/reference/**', 'config/**', 'data/snapshots/**', '.github/workflows/rust-migration.yml']
+    paths: ['backend/**', 'frontend/**', 'fixtures/reference/**', 'config/**', 'data/snapshots/**', '.github/workflows/rust-migration.yml', 'rust-toolchain.toml']
 permissions:
   contents: read
 jobs:
@@ -12,8 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: 1.98.1 # keep equal to rust-toolchain.toml
           components: rustfmt, clippy
       - run: cargo fmt --manifest-path backend/Cargo.toml --all --check
       - run: cargo clippy --locked --manifest-path backend/Cargo.toml --workspace --all-targets -- -D warnings
@@ -23,7 +24,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.1 # keep equal to rust-toolchain.toml
       - name: Fixtures against recomputed Rust science
         run: cargo test --locked --manifest-path backend/Cargo.toml --workspace --test 'differential_*'
       - name: Offline CLI from frozen snapshot
@@ -43,7 +46,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.1 # keep equal to rust-toolchain.toml
       - run: |
           if [ -f package-lock.json ]; then
             npm ci --no-audit --no-fund

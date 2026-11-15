@@ -2,7 +2,7 @@
 pub mod engine;
 use axum::{
     extract::{rejection::JsonRejection, DefaultBodyLimit, State},
-    http::{HeaderValue, Method, StatusCode},
+    http::{header, HeaderValue, Method, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
@@ -14,8 +14,29 @@ use tokio::sync::{OnceCell, Semaphore};
 use tower_http::{
     cors::CorsLayer,
     services::{ServeDir, ServeFile},
+    set_header::{SetResponseHeader, SetResponseHeaderLayer},
     trace::TraceLayer,
 };
+
+/// `Cache-Control` for API responses: results depend on the request body and must not be reused.
+pub const API_CACHE_CONTROL: &str = "no-store";
+/// `Cache-Control` for content-hashed bundles under `/_app/immutable/`.
+pub const IMMUTABLE_CACHE_CONTROL: &str = "public, max-age=31536000, immutable";
+/// `Cache-Control` for HTML and other unhashed static files: always revalidate.
+pub const STATIC_CACHE_CONTROL: &str = "no-cache";
+/// Content-Security-Policy sent as a header. Inline scripts are further limited to the hashes in the
+/// `<meta>` CSP that SvelteKit writes into each page (`kit.csp`, frontend/svelte.config.js); a browser
+/// enforces both policies.
+pub const CONTENT_SECURITY_POLICY: &str = "default-src 'self'; script-src 'self' 'unsafe-inline'; \
+style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; \
+object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+
+fn header_layer(
+    name: axum::http::HeaderName,
+    value: &'static str,
+) -> SetResponseHeaderLayer<HeaderValue> {
+    SetResponseHeaderLayer::if_not_present(name, HeaderValue::from_static(value))
+}
 
 #[derive(Default)]
 struct DefaultCache {
@@ -304,15 +325,48 @@ pub fn router_with_limits(
         .route("/openapi.json", get(openapi))
         .fallback(not_found)
         .method_not_allowed_fallback(wrong_method)
-        .with_state(state);
-    let mut app = Router::new().route("/health", get(health)).nest("/v1", api);
+        .with_state(state)
+        .layer(header_layer(header::CACHE_CONTROL, API_CACHE_CONTROL));
+    let mut app = Router::new()
+        .route(
+            "/health",
+            get(health).layer(header_layer(header::CACHE_CONTROL, API_CACHE_CONTROL)),
+        )
+        .nest("/v1", api);
     if let Some(dir) = static_dir {
         let spa = ServeFile::new(dir.join("200.html"));
-        app = app.fallback_service(ServeDir::new(dir).not_found_service(spa));
+        app = app
+            .nest_service(
+                "/_app/immutable",
+                SetResponseHeader::if_not_present(
+                    ServeDir::new(dir.join("_app/immutable")),
+                    header::CACHE_CONTROL,
+                    HeaderValue::from_static(IMMUTABLE_CACHE_CONTROL),
+                ),
+            )
+            .fallback_service(SetResponseHeader::if_not_present(
+                ServeDir::new(dir).not_found_service(spa),
+                header::CACHE_CONTROL,
+                HeaderValue::from_static(STATIC_CACHE_CONTROL),
+            ));
     } else {
         app = app.fallback(not_found);
     }
-    app.layer(DefaultBodyLimit::max(64 * 1024))
+    app.layer(header_layer(header::X_CONTENT_TYPE_OPTIONS, "nosniff"))
+        .layer(header_layer(header::X_FRAME_OPTIONS, "DENY"))
+        .layer(header_layer(
+            header::REFERRER_POLICY,
+            "strict-origin-when-cross-origin",
+        ))
+        .layer(header_layer(
+            header::CONTENT_SECURITY_POLICY,
+            CONTENT_SECURITY_POLICY,
+        ))
+        .layer(header_layer(
+            axum::http::HeaderName::from_static("permissions-policy"),
+            "camera=(), microphone=(), geolocation=()",
+        ))
+        .layer(DefaultBodyLimit::max(64 * 1024))
         .layer(TraceLayer::new_for_http())
         .layer(
             CorsLayer::new()
