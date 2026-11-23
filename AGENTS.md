@@ -22,6 +22,15 @@ FieldShift Optimizer: app web de apoio à decisão (API Rust + frontend SvelteKi
 | Plano de preparação (13/11), riscos, ordem de execução | `docs/planning/PLANO-PREPARACAO-13-11.md` |
 | Fontes e parâmetros de dados | `docs/DATA_SOURCES.md` |
 | Protocolo de avaliação | `docs/EVALUATION_PROTOCOL.md` |
+| Mapa de funcionalidades e fluxos verificáveis | `feature-map.yaml` |
+| Escudo anti-regressão (camada Dune + `verify-fieldshift`) | `docs/REGRESSION_SHIELD.md` |
+| Lições estruturais e travas mecânicas | `REVIEW.md` |
+
+## Escudo Anti-Regressão (Comandos Obrigatórios Antes da Revisão)
+
+- Checagem arquitetural determinística (Camada Dune C1–C5 + pre-commit): `python3 scripts/check-fieldshift-structure --self-test`
+- Verificação real fim a fim (API Rust + build SvelteKit + Playwright desktop/mobile): `scripts/verify-fieldshift --mission <mission-id> --flows main,invalid-weights,exploratory-soil`
+- Calibração das 3 fixtures (A→1 FAIL, B→0 PASS, C→3 BLOCKED): `scripts/verify-fieldshift --mission <id> --fixture A|B|C`
 
 ## Estrutura
 
