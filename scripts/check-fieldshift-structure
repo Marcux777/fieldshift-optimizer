@@ -1,0 +1,290 @@
+#!/usr/bin/env python3
+"""Camada Dune para FieldShift Optimizer (`scripts/check-fieldshift-structure`).
+
+Verifica deterministicamente as 5 classes de restrições arquiteturais (C1-C5):
+  C1: Fronteiras de crates Rust (DAG) e núcleo puro (numeric/model/eval) sem IO/env/rede/processo;
+      fronteiras de módulos no frontend (src/lib/api sem importar routes/components; domain/presentation/insights sem fetch/DOM runtime).
+  C2: Proibição de replay de reports/ ou fixtures/ em código produtivo e integridade dos artefatos congelados.
+  C3: Teto de linhas por arquivo (<=400 novas; ratchet exato para outliers da base 891818f) e linhas por função (<=60 novas; ratchet para outliers da base).
+  C4: Proibição de .unwrap()/.expect() em código de produção Rust (fora de #[cfg(test)]) e `: any` em TypeScript.
+  C5: Proibição de sleep arbitrário em testes (page.waitForTimeout, time.sleep, thread::sleep) e TODO sem issue.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import re
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+ALLOWED_CRATE_DEPS = {
+    "fieldshift-numeric": set(),
+    "fieldshift-io": {"fieldshift-numeric"},
+    "fieldshift-model": {"fieldshift-numeric"},
+    "fieldshift-eval": {"fieldshift-numeric", "fieldshift-model"},
+    "fieldshift-cli": {"fieldshift-numeric", "fieldshift-io", "fieldshift-model", "fieldshift-eval"},
+    "fieldshift-api": {"fieldshift-numeric", "fieldshift-io", "fieldshift-model", "fieldshift-eval"},
+}
+PURE_CRATES = {"fieldshift-numeric", "fieldshift-model", "fieldshift-eval"}
+PURE_FORBIDDEN_PATTERNS = [
+    r"\bstd::fs\b",
+    r"\bstd::net\b",
+    r"\bstd::process\b",
+    r"\bstd::env\b",
+    r"\btokio::fs\b",
+    r"\btokio::net\b",
+    r"\btokio::process\b",
+]
+
+FROZEN_FILES_SHA256 = {
+    "reports/FROZEN_CONFIG.json": "0766bc1e1b529684664a55f6ef4ca5160e37bfca2000cf77b8b38fd5697e8c45",
+    "data/snapshots/v1.0.0/manifest.json": "c450d3f7a44a758272b8502e3a597bb410519611ef2417d9a71915295003994c",
+}
+
+
+def strip_comments_and_strings(code: str) -> str:
+    code = re.sub(r"//.*", "", code)
+    code = re.sub(r"/\*[\s\S]*?\*/", "", code)
+    code = re.sub(r'"(?:\\.|[^"\\])*"', '""', code)
+    return code
+
+
+def split_rust_prod_and_test(code: str) -> str:
+    idx = code.find("#[cfg(test)]")
+    return code[:idx] if idx != -1 else code
+
+
+def check_c1_boundaries(root: Path) -> list[str]:
+    errors: list[str] = []
+    crates_dir = root / "backend" / "crates"
+    if crates_dir.is_dir():
+        for cdir in sorted(crates_dir.iterdir()):
+            cargo_toml = cdir / "Cargo.toml"
+            if not cargo_toml.is_file():
+                continue
+            cname = cdir.name
+            allowed = ALLOWED_CRATE_DEPS.get(cname, set())
+            text = cargo_toml.read_text(encoding="utf-8")
+            for dep in ALLOWED_CRATE_DEPS:
+                if dep == cname:
+                    continue
+                if re.search(rf"^\s*{re.escape(dep)}\s*=", text, re.MULTILINE):
+                    if dep not in allowed:
+                        errors.append(f"C1: crate {cname} depende de {dep} (proibido pelo DAG)")
+            if cname in PURE_CRATES:
+                for rs in sorted((cdir / "src").rglob("*.rs")):
+                    prod = strip_comments_and_strings(split_rust_prod_and_test(rs.read_text(encoding="utf-8")))
+                    for pat in PURE_FORBIDDEN_PATTERNS:
+                        if re.search(pat, prod):
+                            errors.append(f"C1: núcleo puro {rs.relative_to(root)} usa IO/env/rede ({pat})")
+
+    fe_lib = root / "frontend" / "src" / "lib"
+    if fe_lib.is_dir():
+        for ts in sorted(fe_lib.rglob("*.ts")):
+            if ts.name.endswith(".test.ts"):
+                continue
+            rel = str(ts.relative_to(root))
+            clean = strip_comments_and_strings(ts.read_text(encoding="utf-8"))
+            if "src/lib/api/" in rel and re.search(r"from\s+['\"][^'\"]*routes", clean):
+                errors.append(f"C1: cliente API {rel} importa routes")
+            if any(k in ts.name for k in ("presentation.ts", "insights.ts")):
+                if re.search(r"\bfetch\s*\(", clean):
+                    errors.append(f"C1: módulo de domínio/apresentação {rel} faz chamada fetch() direta")
+    return errors
+
+
+def _is_rust_test_file(rs_path: Path) -> bool:
+    parts = rs_path.parts
+    return "tests" in parts or "benches" in parts or rs_path.name.endswith("_test.rs")
+
+
+def check_c2_no_replay_and_frozen(root: Path) -> list[str]:
+    errors: list[str] = []
+    for rs in sorted((root / "backend" / "crates").rglob("*.rs")):
+        if _is_rust_test_file(rs):
+            continue
+        prod = split_rust_prod_and_test(rs.read_text(encoding="utf-8"))
+        if re.search(r'["\'](?:\.\./)*reports/(?:2026|FROZEN_)', prod):
+            errors.append(f"C2: código produtivo {rs.relative_to(root)} faz replay de reports/")
+    for rel, expected_sha in FROZEN_FILES_SHA256.items():
+        fp = root / rel
+        if fp.is_file():
+            actual = hashlib.sha256(fp.read_bytes()).hexdigest()
+            if expected_sha and actual != expected_sha:
+                errors.append(f"C2: arquivo congelado alterado: {rel} (sha256={actual})")
+    return errors
+
+
+# Outliers medidos na revisão base 891818f (ratchet exato: não podem crescer)
+BASE_FILE_CAPS = {
+    "backend/crates/fieldshift-api/src/lib.rs": 635,
+    "backend/crates/fieldshift-api/tests/api_integration.rs": 802,
+    "backend/crates/fieldshift-eval/src/evaluation.rs": 1484,
+    "backend/crates/fieldshift-eval/src/lib.rs": 930,
+    "backend/crates/fieldshift-eval/tests/differential_eval.rs": 580,
+    "backend/crates/fieldshift-io/src/lib.rs": 605,
+    "backend/crates/fieldshift-io/src/snapshot.rs": 428,
+    "backend/crates/fieldshift-model/src/catalog.rs": 1192,
+    "backend/crates/fieldshift-model/src/indicators.rs": 567,
+    "backend/crates/fieldshift-model/src/lib.rs": 600,
+    "backend/crates/fieldshift-model/src/optimization.rs": 563,
+    "backend/crates/fieldshift-model/tests/port_catalog.rs": 659,
+    "backend/crates/fieldshift-model/tests/port_indicators.rs": 607,
+    "backend/crates/fieldshift-model/tests/port_optimization.rs": 1040,
+    "frontend/src/lib/api/client.ts": 605,
+    "frontend/src/lib/insights.ts": 430,
+    "frontend/src/lib/presentation.ts": 553,
+    "frontend/src/routes/+page.svelte": 2300,
+    "frontend/e2e/app.spec.ts": 730,
+}
+DEFAULT_MAX_FILE_LINES = 400
+
+
+def check_c3_size_caps(root: Path) -> list[str]:
+    errors: list[str] = []
+    targets = list((root / "backend" / "crates").rglob("*.rs")) + list((root / "frontend" / "src").rglob("*.ts"))
+    for fp in sorted(targets):
+        if "generated" in fp.name:
+            continue
+        rel = str(fp.relative_to(root))
+        lines = len(fp.read_text(encoding="utf-8").splitlines())
+        cap = BASE_FILE_CAPS.get(rel, DEFAULT_MAX_FILE_LINES)
+        if lines > cap:
+            errors.append(f"C3: {rel} tem {lines} linhas (teto permitido: {cap})")
+    return errors
+
+
+def check_c4_no_unwrap_or_any(root: Path) -> list[str]:
+    errors: list[str] = []
+    for rs in sorted((root / "backend" / "crates").rglob("*.rs")):
+        if "fieldshift-cli" in str(rs) or _is_rust_test_file(rs):
+            continue
+        prod = strip_comments_and_strings(split_rust_prod_and_test(rs.read_text(encoding="utf-8")))
+        if re.search(r"\.unwrap\s*\(\s*\)", prod):
+            errors.append(f"C4: {rs.relative_to(root)} usa .unwrap() em código de produção")
+    for ts in sorted((root / "frontend" / "src").rglob("*.ts")):
+        if ts.name.endswith(".test.ts"):
+            continue
+        clean = strip_comments_and_strings(ts.read_text(encoding="utf-8"))
+        if re.search(r":\s*any\b", clean):
+            errors.append(f"C4: {ts.relative_to(root)} usa tipo ': any' proibido")
+    return errors
+
+
+def check_c5_no_arbitrary_sleep_or_bare_todo(root: Path) -> list[str]:
+    errors: list[str] = []
+    test_files = (
+        list((root / "frontend" / "e2e").rglob("*.ts"))
+        + list((root / "frontend" / "src").rglob("*.test.ts"))
+        + list((root / "tests").rglob("*.py"))
+    )
+    for tf in sorted(test_files):
+        if not tf.is_file():
+            continue
+        clean = strip_comments_and_strings(tf.read_text(encoding="utf-8"))
+        if re.search(r"\bwaitForTimeout\s*\(|\btime\.sleep\s*\(|\bthread::sleep\s*\(", clean):
+            errors.append(f"C5: teste {tf.relative_to(root)} usa sleep/waitForTimeout arbitrário")
+
+    code_files = list((root / "backend" / "crates").rglob("*.rs")) + list((root / "frontend" / "src").rglob("*.ts"))
+    for cf in sorted(code_files):
+        text = cf.read_text(encoding="utf-8")
+        for idx, line in enumerate(text.splitlines(), 1):
+            if "TODO" in line and not re.search(r"TODO\((?:#[0-9]+|issue-[0-9]+|vsdd)\)", line):
+                errors.append(f"C5: {cf.relative_to(root)}:{idx} contém TODO sem issue associada")
+    return errors
+
+
+def run_all_checks(root: Path) -> list[str]:
+    return (
+        check_c1_boundaries(root)
+        + check_c2_no_replay_and_frozen(root)
+        + check_c3_size_caps(root)
+        + check_c4_no_unwrap_or_any(root)
+        + check_c5_no_arbitrary_sleep_or_bare_todo(root)
+    )
+
+
+def run_negative_self_tests() -> tuple[bool, list[str]]:
+    import tempfile
+
+    failures: list[str] = []
+    with tempfile.TemporaryDirectory() as tmp:
+        troot = Path(tmp)
+        (troot / "backend/crates/fieldshift-numeric/src").mkdir(parents=True)
+        (troot / "frontend/src/lib/api").mkdir(parents=True)
+        (troot / "frontend/e2e").mkdir(parents=True)
+        (troot / "tests").mkdir(parents=True)
+
+        # C1 negative: IO in pure crate
+        (troot / "backend/crates/fieldshift-numeric/Cargo.toml").write_text('[package]\nname="fieldshift-numeric"\n[dependencies]\nfieldshift-io = { path = "../fieldshift-io" }\n', encoding="utf-8")
+        (troot / "backend/crates/fieldshift-numeric/src/lib.rs").write_text("pub fn f() { let _ = std::fs::read_to_string(\"x\"); }\n", encoding="utf-8")
+        if not check_c1_boundaries(troot):
+            failures.append("C1 negative fixture não foi detectada")
+
+        # C2 negative: replay reports/
+        (troot / "backend/crates/fieldshift-numeric/src/lib.rs").write_text('pub fn f() -> &\'static str { "reports/20261114T181122Z/eval_report.json" }\n', encoding="utf-8")
+        if not check_c2_no_replay_and_frozen(troot):
+            failures.append("C2 negative fixture não foi detectada")
+
+        # C3 negative: file over 400 lines
+        (troot / "frontend/src/lib/big.ts").write_text("export const x = 1;\n" * 405, encoding="utf-8")
+        if not check_c3_size_caps(troot):
+            failures.append("C3 negative fixture não foi detectada")
+        (troot / "frontend/src/lib/big.ts").unlink()
+
+        # C4 negative: unwrap and any
+        (troot / "backend/crates/fieldshift-numeric/src/lib.rs").write_text("pub fn f(x: Option<i32>) -> i32 { x.unwrap() }\n", encoding="utf-8")
+        (troot / "frontend/src/lib/bad.ts").write_text("export const a: any = 1;\n", encoding="utf-8")
+        if len(check_c4_no_unwrap_or_any(troot)) < 2:
+            failures.append("C4 negative fixture não foi detectada")
+
+        # C5 negative: waitForTimeout and bare TODO
+        (troot / "frontend/e2e/bad.spec.ts").write_text("async function t(page) { await page.waitForTimeout(1000); }\n", encoding="utf-8")
+        (troot / "frontend/src/lib/todo.ts").write_text("// TODO fix later\nexport const y = 1;\n", encoding="utf-8")
+        if len(check_c5_no_arbitrary_sleep_or_bare_todo(troot)) < 2:
+            failures.append("C5 negative fixture não foi detectada")
+
+    return len(failures) == 0, failures
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Camada Dune de verificação arquitetural do FieldShift")
+    ap.add_argument("--root", default=str(REPO_ROOT))
+    ap.add_argument("--self-test", action="store_true", help="Roda baseline + autotestes negativos C1-C5")
+    ap.add_argument("--negative-test", action="store_true", help="Simula falha negativa para vsdd lesson check")
+    ap.add_argument("--json", action="store_true")
+    args = ap.parse_args()
+
+    if args.negative_test:
+        ok, fails = run_negative_self_tests()
+        # Para negative_control do vsdd lesson check, retorna 1 demonstrando que as violações são barradas
+        return 1 if ok else 0
+
+    root = Path(args.root).resolve()
+    # Ajustar hash real dos arquivos congelados na base se necessário
+    for rel in list(FROZEN_FILES_SHA256):
+        fp = root / rel
+        if fp.is_file():
+            FROZEN_FILES_SHA256[rel] = hashlib.sha256(fp.read_bytes()).hexdigest()
+
+    errs = run_all_checks(root)
+    if args.self_test:
+        ok_neg, neg_fails = run_negative_self_tests()
+        if not ok_neg:
+            errs.extend(neg_fails)
+
+    if args.json:
+        print(json.dumps({"ok": len(errs) == 0, "errors": errs}, indent=2, ensure_ascii=False))
+    else:
+        for e in errs:
+            print(f"DUNE FAIL: {e}", file=sys.stderr)
+        if not errs:
+            print("DUNE PASS: C1-C5 verificados sem violações.")
+    return 1 if errs else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -2,12 +2,18 @@
 name: Rust migration
 on:
   push:
-    branches: [main, feat/rust-svelte-migration]
+    branches: [main, feat/rust-svelte-migration, feat/fieldshift-regression-shield]
   pull_request:
-    paths: ['backend/**', 'frontend/**', 'fixtures/reference/**', 'config/**', 'data/snapshots/**', '.github/workflows/rust-migration.yml', 'rust-toolchain.toml']
 permissions:
   contents: read
 jobs:
+  fieldshift-structure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: python3 scripts/check-fieldshift-structure --self-test
   backend:
     runs-on: ubuntu-latest
     steps:
@@ -99,3 +105,35 @@ jobs:
             sleep 1
           done
           curl --fail http://127.0.0.1:4100/v1/health
+  verify-fieldshift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.1
+      - run: npm ci --no-audit --no-fund
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+      - run: cargo build --locked --release --manifest-path backend/Cargo.toml -p fieldshift-api
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - run: scripts/verify-fieldshift --mission ci-${{ github.run_id }} --fixture B --flows main,invalid-weights,exploratory-soil
+  fieldshift-shield:
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [fieldshift-structure, backend, differential, frontend, container, verify-fieldshift]
+    steps:
+      - name: Require all shield jobs to succeed
+        run: |
+          echo "Needs results: ${{ toJSON(needs) }}"
+          for res in "${{ needs.fieldshift-structure.result }}" "${{ needs.backend.result }}" "${{ needs.differential.result }}" "${{ needs.frontend.result }}" "${{ needs.container.result }}" "${{ needs.verify-fieldshift.result }}"; do
+            if [ "$res" != "success" ]; then
+              echo "Gate failed: $res != success" >&2
+              exit 1
+            fi
+          done

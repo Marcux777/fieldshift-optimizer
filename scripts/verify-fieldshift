@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# AI-assisted (OpenBot agent)
+set -euo pipefail
+root="$(cd "$(dirname "$0")/.." && pwd)"
+exec timeout --signal=TERM --kill-after=25s 3600s node "$root/.agents/skills/verify-fieldshift/scripts/verify.mjs" "$@"

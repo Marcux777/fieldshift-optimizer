@@ -1,0 +1,6 @@
+# CODEOWNERS — FieldShift Optimizer
+* @Marcux777
+.github/ @Marcux777
+scripts/ @Marcux777
+feature-map.yaml @Marcux777
+REVIEW.md @Marcux777

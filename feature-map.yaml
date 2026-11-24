@@ -1,0 +1,73 @@
+# FieldShift Optimizer — Feature Map & Verification Contract
+schema_version: "fieldshift-feature-map/1"
+app: fieldshift
+base_revision: "891818f585361abeb844a64b36e45231ed3c8c76"
+
+build:
+  backend: "cargo build --manifest-path backend/Cargo.toml --release -p fieldshift-api --locked"
+  frontend: "npm --prefix frontend run build"
+
+launch:
+  binary: "backend/target/release/fieldshift-api"
+  static_dir: "frontend/build"
+  env:
+    FIELDSHIFT_ROOT: "."
+    FIELDSHIFT_STATIC_DIR: "frontend/build"
+    BIND_ADDRESS: "127.0.0.1:<ephemeral_port>"
+  health_endpoint: "/v1/health"
+  readiness_timeout_s: 90
+
+api_endpoints:
+  - path: "/v1/health"
+    method: "GET"
+    expect_status: 200
+  - path: "/v1/run"
+    method: "POST"
+    expect_status: 200
+  - path: "/v1/evaluate"
+    method: "POST"
+    expect_status: 200
+
+ui_tabs:
+  - name: "Overview"
+    selector: "[data-testid='outcome-heading']"
+  - name: "Policy comparison"
+    selector: "[data-testid='policy-comparison-section']"
+  - name: "Pareto and alternatives"
+    selector: "[data-testid='pareto-section']"
+  - name: "Retrospective evaluation"
+    selector: "[data-testid='retrospective-evaluation-section']"
+  - name: "Weight sensitivity"
+    selector: "[data-testid='weight-sensitivity-section']"
+  - name: "Sources and limitations"
+    selector: "[data-testid='sources-section']"
+
+flows:
+  main:
+    description: "Executa avaliação congelada padrão ao vivo na API Rust pelas 6 abas (desktop 1280x800 e mobile 390x844) sem overflow horizontal."
+    playwright_test: "renders default frozen evaluation computed live by Rust API across all 6 tabs without horizontal overflow"
+    assertions:
+      frozen_outcome_banner: "Frozen evaluation outcome: NEGATIVE"
+      disclaimer_banner: "does not replace"
+      outcome_heading: "Outcome: NEGATIVE"
+      kpi_n_plans: "576"
+      kpi_n_front: "36"
+      run_result_hash: "b43703326690e6d0ddd2be48641fbdb9ba46908810ebfca0c8c90a379c79fd66"
+      eval_result_hash: "504c28e85e54cbd4e9470e8a423499299dcbed643cb9b2ff8aa461873e134c18"
+  invalid-weights:
+    description: "Validação inline de pesos inválidos, bloqueio de submissão e manutenção do resultado anterior marcado como stale."
+    playwright_test: "invalid weights are flagged inline, block submission and keep previous results visible as stale"
+  exploratory-soil:
+    description: "Execução exploratória na classe de solo AD1 exibindo diagnóstico de inviabilidade ZARC do P0 e completando P1/P1b/P2."
+    playwright_test: "renders exploratory P0 diagnostics on AD1 soil class while completing P1/P1b/P2 evaluation"
+
+required_data:
+  config_dir: "config"
+  snapshots_dir: "data/snapshots/power-daily-2.10.3-lat-18_lon-50.625-46c276253b44"
+
+verification_entrypoint: "scripts/verify-fieldshift"
+exit_codes:
+  PASS: 0
+  FAIL: 1
+  USAGE: 2
+  BLOCKED: 3
